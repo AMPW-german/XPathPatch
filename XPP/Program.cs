@@ -1,6 +1,6 @@
 
 using System;
-using XPP.XPatch;
+using XPP.Path;
 
 namespace XPP;
 
@@ -8,12 +8,18 @@ public static class Program
 {
   public static void Main(string[] args)
   {
-    var xpath = XPath.Parse("child::para[position()=last()-1]");
+    var xpath = XPath.Parse("child::para[position()=5][attribute::type='warning']");
     Console.WriteLine(xpath.Source);
-    for (var i = 0; i < xpath.Nodes.Length; i++)
+    Console.WriteLine(new string(xpath.Data));
+    for (var i = 0; i < xpath.Vals.Length; i++)
     {
-      var node = xpath.Nodes[i];
-      Console.WriteLine($"{i:00} {node.Type} {node.Token.Type} '{xpath.Source.AsSpan()[node.Token.Data]}' {node.Child0} {node.Child1}");
+      ref var val = ref xpath.Vals[i];
+      Console.WriteLine($"V{i:00} {val.Type} {val.Left} {val.Right}");
+    }
+    for (var i = 0; i < xpath.Paths.Length; i++)
+    {
+      ref var path = ref xpath.Paths[i];
+      Console.WriteLine($"P{i:00} {path.Type} {path.Paths} {path.Name}");
     }
   }
 }
