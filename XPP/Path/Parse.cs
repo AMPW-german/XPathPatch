@@ -135,10 +135,17 @@ public ref struct Parser
 
   private Exception Invalid(string msg = null) => throw new InvalidOperationException(msg);
 
-  private Exception Invalid(TokenType expected) => throw new InvalidOperationException($"{expected}");
+  private Exception Invalid(TokenType expected)
+  {
+    Peek(out var tok);
+    throw new InvalidOperationException($"{TokStr(tok)} {tok.Type} != {expected}");
+  }
 
-  private Exception Invalid(params TokenType[] expected) =>
-    throw new InvalidOperationException($"{string.Join(',', expected)}");
+  private Exception Invalid(params TokenType[] expected)
+  {
+    Peek(out var tok);
+    throw new InvalidOperationException($"{TokStr(tok)} {tok.Type} != {string.Join(',', expected)}");
+  }
 
   private int Push(AstNode node)
   {

@@ -28,6 +28,9 @@ public readonly struct PathOp(PathOpType type)
 
   // Filter
   public int Filter { get => v0; init => v0 = value; }
+
+  // Normalize
+  public bool Dedupe { get => v0 != 0; init => v0 = value ? 1 : 0; }
 }
 
 public readonly struct ValOp(ValOpType type, int left = -1, int right = -1)
@@ -83,12 +86,21 @@ public ref struct Compiler
   {
     public int PathStart = -1;
     public int PathIdx = -1;
+    public int PathPrev = -1;
+    public int PathNext = -1;
+    public StateFlags Flags = 0;
     public int ValIdx = -1;
   }
 
-  private class CompileBuf<O, T> : ThreadBuf<O, T>, IThreadBuf
-    where O : CompileBuf<O, T>
-    where T : unmanaged
+  [Flags]
+  private enum StateFlags
+  {
+    IsOrdered = 1,
+    IsDeduped = 2,
+    IsNorm = IsOrdered | IsDeduped,
+  }
+
+  private class CompileBuf<O, T> : ThreadBuf<O, T>, IThreadBuf where O : CompileBuf<O, T>
   {
     public static int Size => XPath.MAX_LENGTH;
   }
@@ -147,17 +159,33 @@ public ref struct Compiler
 
   private void CompileExpr(int index)
   {
-    WalkExpr(index, new ExprCompilePass());
+    var compile = new ExprCompilePass();
+    var backfill = new ExprBackfillPass();
+
+    WalkExpr(index, ref compile);
     DrainQueue();
-    WalkExpr(index, new ExprBackfillPass());
+    WalkExpr(index, ref backfill);
   }
 
   private void CompilePath(int index)
   {
     states[index].PathStart = paths.Length;
-    WalkPath(index, new PathCompilePass());
+
+    var mark = new PathMarkPass();
+    var compile = new PathCompilePass();
+    var backfill = new PathBackfillPass();
+
+    WalkPath(index, ref mark);
+    mark.FinishMark(ref this);
+
+    WalkPath(index, ref compile);
+    if (!paths[^1].Type.IsRoot)
+    {
+      compile.EnsureAxis(ref this);
+      AddPath(new(PathOpType.Context));
+    }
     DrainQueue();
-    WalkPath(index, new PathBackfillPass());
+    WalkPath(index, ref backfill);
   }
 
   private void QueuePath(int index) => queue.Add(~index);
@@ -217,7 +245,7 @@ public ref struct Compiler
             TokenType.String => new(ValOpType.String, compiler.AddDataVal(node.Token, 1, 1)),
             TokenType.Number => new(ValOpType.Number,
               new Value { Number = double.Parse(compiler.TokStr(node.Token)) }),
-            _ => throw new NotImplementedException($"{node.Token.Type}"),
+            _ => throw new InvalidOperationException($"{node.Token.Type}"),
           });
           break;
         case AstType.FuncCall:
@@ -285,6 +313,61 @@ public ref struct Compiler
     }
   }
 
+  // mark path next nodes and flags
+  private struct PathMarkPass() : ICompilerPass
+  {
+    private int last = -1;
+
+    public void Visit(ref Compiler compiler, int idx, ref readonly AstNode node, ref State state)
+    {
+      if (last != -1)
+      {
+        compiler.states[last].PathNext = idx;
+        state.PathPrev = last;
+      }
+      last = idx;
+    }
+
+    public void FinishMark(ref Compiler compiler)
+    {
+      var idx = last;
+      StateFlags lastFlags = StateFlags.IsNorm;
+      while (idx != -1)
+      {
+        ref readonly var node = ref compiler.nodes[idx];
+        ref var state = ref compiler.states[idx];
+
+        // set flags based on what the previous node will receive
+        state.Flags = node.Type switch
+        {
+          AstType.Root => StateFlags.IsNorm,
+          AstType.Sep => StateFlags.IsNorm,
+          AstType.Axis when compiler.ParseAxisType(node.Token) is AxisType axis =>
+            FlagOrdered(axis.IsForward) | FlagDeduped(!axis.CanDupe && !lastFlags.HasFlag(StateFlags.IsDeduped)),
+          AstType.NodeTest => lastFlags,
+          AstType.ProcType => lastFlags,
+          AstType.Filter => lastFlags,
+          AstType.Union => StateFlags.IsNorm,
+          _ => throw new InvalidOperationException($"{node.Type}"),
+        };
+
+        idx = state.PathPrev;
+        lastFlags = state.Flags;
+      }
+    }
+
+    private static StateFlags FlagOrdered(bool ordered) => ordered ? StateFlags.IsOrdered : 0;
+    private static StateFlags FlagDeduped(bool ordered) => ordered ? StateFlags.IsDeduped : 0;
+  }
+  private AxisType ParseAxisType(Token tok) => tok.Type switch
+  {
+    TokenType.AxisName => XPath.ParseAxisType(TokStr(tok)),
+    TokenType.Attr => AxisType.Attribute,
+    TokenType.Self => AxisType.Self,
+    TokenType.Parent => AxisType.Parent,
+    _ => throw new InvalidOperationException($"{tok.Type}"),
+  };
+
   // assign all path nodes and queue child expressions and paths
   private struct PathCompilePass() : ICompilerPass
   {
@@ -298,8 +381,19 @@ public ref struct Compiler
       hasAxis = true;
     }
 
+    private void EnsureNorm(ref Compiler compiler, StateFlags nextFlags)
+    {
+      if (nextFlags == StateFlags.IsNorm)
+        return;
+      compiler.AddPath(new(PathOpType.Normalize) { Dedupe = !nextFlags.HasFlag(StateFlags.IsDeduped) });
+    }
+
     public void Visit(ref Compiler compiler, int idx, ref readonly AstNode node, ref State state)
     {
+      if (state.PathPrev == -1)
+        EnsureNorm(ref compiler, state.Flags);
+
+      var nextFlags = state.PathNext != -1 ? compiler.states[state.PathNext].Flags : StateFlags.IsNorm;
       switch (node.Type)
       {
         case AstType.Root:
@@ -312,6 +406,7 @@ public ref struct Compiler
           EnsureAxis(ref compiler);
           if (node.Token.Type == TokenType.OpSepDesc)
             compiler.AddPath(new(PathOpType.Axis) { Axis = AxisType.DescendantOrSelf });
+          EnsureNorm(ref compiler, nextFlags);
           hasAxis = false;
           break;
         case AstType.Axis:
@@ -329,21 +424,27 @@ public ref struct Compiler
           hasAxis = true;
           break;
         case AstType.NodeTest:
-          compiler.AddPath(node.Token.Type switch
+          switch (node.Token.Type)
           {
-            TokenType.NtAny => new(PathOpType.NameTest) { Ns = 0..0, Name = 0..0 },
-            TokenType.NtAnyNs => new(PathOpType.NameTest) { Ns = compiler.AddNs(node.Token), Name = 0..0 },
-            TokenType.NtName => new(PathOpType.NameTest)
-            {
-              Ns = compiler.AddNs(node.Token),
-              Name = compiler.AddName(node.Token)
-            },
-            TokenType.NodeType => new(PathOpType.NodeType)
-            {
-              NodeType = XPath.ParseNodeType(compiler.TokStr(node.Token))
-            },
-            _ => throw new InvalidOperationException($"{node.Type} {node.Token.Type}"),
-          });
+            case TokenType.NtAny: break;
+            case TokenType.NtAnyNs:
+              compiler.AddPath(new(PathOpType.NameTest) { Ns = compiler.AddNs(node.Token), Name = 0..0 });
+              break;
+            case TokenType.NtName:
+              compiler.AddPath(new(PathOpType.NameTest)
+              {
+                Ns = compiler.AddNs(node.Token),
+                Name = compiler.AddName(node.Token)
+              });
+              break;
+            case TokenType.NodeType:
+              var ntype = XPath.ParseNodeType(compiler.TokStr(node.Token));
+              if (ntype != NodeType.Node)
+                compiler.AddPath(new(PathOpType.NodeType) { NodeType = ntype });
+              break;
+            default:
+              throw new InvalidOperationException($"{node.Type} {node.Token.Type}");
+          }
           hasAxis = false;
           break;
         case AstType.ProcType:
@@ -383,7 +484,7 @@ public ref struct Compiler
         case AstType.Union:
           compiler.paths[state.PathIdx] = new(PathOpType.Union)
           {
-            Paths = (compiler.ValOpIndex(node.Child0), compiler.ValOpIndex(node.Child1))
+            Paths = (compiler.PathStart(node.Child0), compiler.PathStart(node.Child1))
           };
           break;
       }
@@ -416,7 +517,7 @@ public ref struct Compiler
     return new() { String = data.AddRange(str[strim..^etrim]) };
   }
 
-  private void WalkExpr<T>(int idx, in T visitor) where T : struct, ICompilerPass, allows ref struct
+  private void WalkExpr<T>(int idx, ref T visitor) where T : struct, ICompilerPass, allows ref struct
   {
     ref readonly var node = ref nodes[idx];
     switch (node.Type)
@@ -436,26 +537,26 @@ public ref struct Compiler
       case AstType.FuncCall:
         visitor.Visit(ref this, idx, in node, ref states[idx]);
         if (node.Child0 != -1)
-          WalkExpr(node.Child0, in visitor);
+          WalkExpr(node.Child0, ref visitor);
         break;
       case AstType.ArgList:
       case AstType.BoolOp:
       case AstType.CompareOp:
       case AstType.MathOp:
         visitor.Visit(ref this, idx, in node, ref states[idx]);
-        WalkExpr(node.Child0, in visitor);
-        WalkExpr(node.Child1, in visitor);
+        WalkExpr(node.Child0, ref visitor);
+        WalkExpr(node.Child1, ref visitor);
         break;
       case AstType.Negate:
         visitor.Visit(ref this, idx, in node, ref states[idx]);
-        WalkExpr(node.Child0, in visitor);
+        WalkExpr(node.Child0, ref visitor);
         break;
       default:
-        throw new NotImplementedException($"{node.Type}");
+        throw new InvalidOperationException($"{node.Type}");
     }
   }
 
-  private void WalkPath<T>(int idx, in T visitor) where T : struct, ICompilerPass, allows ref struct
+  private void WalkPath<T>(int idx, ref T visitor) where T : struct, ICompilerPass, allows ref struct
   {
     ref readonly var node = ref nodes[idx];
     switch (node.Type)
@@ -463,13 +564,13 @@ public ref struct Compiler
       case AstType.Root:
       case AstType.Axis:
         if (node.Child0 != -1)
-          WalkPath(node.Child0, in visitor);
+          WalkPath(node.Child0, ref visitor);
         visitor.Visit(ref this, idx, in node, ref states[idx]);
         break;
       case AstType.Sep:
-        WalkPath(node.Child1, in visitor);
+        WalkPath(node.Child1, ref visitor);
         visitor.Visit(ref this, idx, in node, ref states[idx]);
-        WalkPath(node.Child0, in visitor);
+        WalkPath(node.Child0, ref visitor);
         break;
       case AstType.NodeTest:
       case AstType.ProcType:
@@ -478,7 +579,7 @@ public ref struct Compiler
         break;
       case AstType.Filter:
         visitor.Visit(ref this, idx, in node, ref states[idx]);
-        WalkPath(node.Child0, in visitor); // walk parent path, but not predicate expression
+        WalkPath(node.Child0, ref visitor); // walk parent path, but not predicate expression
         break;
       // expression nodes should not be direct children of any path node except Filter
       case AstType.Value:
@@ -488,9 +589,8 @@ public ref struct Compiler
       case AstType.CompareOp:
       case AstType.MathOp:
       case AstType.Negate:
-        throw new InvalidOperationException($"Path {node.Type}");
       default:
-        throw new NotImplementedException($"{node.Type}");
+        throw new InvalidOperationException($"Path {node.Type}");
     }
   }
 

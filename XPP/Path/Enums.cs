@@ -87,12 +87,14 @@ public enum AstType
 
 public enum PathOpType
 {
+  Context, // start from context
   Root, // start from root
   Union, // start from union of [Paths]
   Axis, // walk axis from Parent
   NodeType, // filter nodes from Parent by NodeType
   NameTest, // filter nodes from Parent by [ns]:[name] (0:0 is *, 0:>0 is name, >0:>0 is ns:name, >0:0 is ns:*)
   Filter, // filter nodes from Parent by SubExpr
+  Normalize, // sort by document order and Dedupe?
 }
 
 public enum ValOpType
@@ -120,17 +122,17 @@ public enum AxisType
 {
   Invalid,
   Ancestor,         // ancestor
-  AncestorOrSelf,   // ancestor-or-self	
-  Attribute,        // attribute	
-  Child,            // child	
-  Descendant,       // descendant	
-  DescendantOrSelf, // descendant-or-self	
-  Following,        // following	
-  FollowingSibling, // following-sibling	
-  Namespace,        // namespace	
-  Parent,           // parent	
-  Preceding,        // preceding	
-  PrecedingSibling, // preceding-sibling	
+  AncestorOrSelf,   // ancestor-or-self
+  Attribute,        // attribute
+  Child,            // child
+  Descendant,       // descendant
+  DescendantOrSelf, // descendant-or-self
+  Following,        // following
+  FollowingSibling, // following-sibling
+  Namespace,        // namespace
+  Parent,           // parent
+  Preceding,        // preceding
+  PrecedingSibling, // preceding-sibling
   Self,             // self
 }
 
@@ -173,6 +175,11 @@ public enum LibraryFunc
   Floor, // number floor(number)
   Ceiling, // number ceiling(number)
   Round, // number round(number)
+}
+
+public enum ValueType
+{
+  Bool, Number, String, NodeSet,
 }
 
 public partial class XPath
@@ -266,7 +273,51 @@ public static partial class Extensions
       TokenType.OpLte => ValOpType.Lte,
       TokenType.OpGt => ValOpType.Gt,
       TokenType.OpGte => ValOpType.Gte,
-      _ => throw new NotImplementedException($"{type}"),
+      _ => throw new InvalidOperationException($"{type}"),
     };
+  }
+
+  extension(AxisType axis)
+  {
+    public bool IsForward => axis switch
+    {
+      AxisType.Ancestor => false,
+      AxisType.AncestorOrSelf => false,
+      AxisType.Attribute => true,
+      AxisType.Child => true,
+      AxisType.Descendant => true,
+      AxisType.DescendantOrSelf => true,
+      AxisType.Following => true,
+      AxisType.FollowingSibling => true,
+      AxisType.Namespace => true,
+      AxisType.Parent => false,
+      AxisType.Preceding => false,
+      AxisType.PrecedingSibling => false,
+      AxisType.Self => true,
+      _ => throw new InvalidOperationException($"{axis}"),
+    };
+
+    public bool CanDupe => axis switch
+    {
+      AxisType.Ancestor => true,
+      AxisType.AncestorOrSelf => true,
+      AxisType.Attribute => false,
+      AxisType.Child => false,
+      AxisType.Descendant => true,
+      AxisType.DescendantOrSelf => true,
+      AxisType.Following => true,
+      AxisType.FollowingSibling => true,
+      AxisType.Namespace => false,
+      AxisType.Parent => true,
+      AxisType.Preceding => true,
+      AxisType.PrecedingSibling => true,
+      AxisType.Self => false,
+      _ => throw new InvalidOperationException($"{axis}"),
+    };
+  }
+
+  extension(PathOpType type)
+  {
+    public bool IsRoot => type is PathOpType.Context or PathOpType.Root or PathOpType.Union;
   }
 }

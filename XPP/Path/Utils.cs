@@ -8,7 +8,17 @@ public ref struct SpanBuf<T>(Span<T> buf)
   private readonly Span<T> buf = buf;
   private int length;
 
-  public int Length => length;
+  public int Length
+  {
+    get => length;
+    set
+    {
+      if (value < 0 || value > length)
+        throw new IndexOutOfRangeException();
+      length = value;
+    }
+  }
+  public int Cap => buf.Length;
 
   public ref T this[int index] => ref buf[index];
 
@@ -36,9 +46,7 @@ public interface IThreadBuf
   public static abstract int Size { get; }
 }
 
-public class ThreadBuf<O, V>
-  where O : ThreadBuf<O, V>, IThreadBuf
-  where V : unmanaged
+public class ThreadBuf<O, V> where O : ThreadBuf<O, V>, IThreadBuf
 {
   [ThreadStatic]
   private static V[] buffer;
