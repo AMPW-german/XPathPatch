@@ -8,7 +8,7 @@ namespace XPP;
 
 public static class Program
 {
-  private const string Path = "//b/ancestor::* | //text()/following::*";
+  private const string Path = "//@id[.>0]/..";
   private const string XML = """
     <root>
       <a id="1">
@@ -156,5 +156,27 @@ public struct NavAdapter(XPathNavigator node) : IXPathNav<NavAdapter>
   {
     nav = Clone();
     return nav.node.MoveToNextNamespace();
+  }
+
+  public int StringValue(Span<char> buffer) =>
+    BuildStringValue(node.UnderlyingObject as XmlNode, buffer);
+
+  // adapted from DocumentXPathNavigator.Value and XmlNode.InnerText
+  private static int BuildStringValue(XmlNode node, Span<char> buffer)
+  {
+    if (node is XmlAttribute or XmlCharacterData)
+    {
+      var val = node.Value;
+      val.AsSpan().CopyTo(buffer);
+      return val.Length;
+    }
+    var child = node.FirstChild;
+    var len = 0;
+    while (child != null)
+    {
+      len += BuildStringValue(child, buffer[len..]);
+      child = child.NextSibling;
+    }
+    return len;
   }
 }

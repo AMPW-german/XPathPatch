@@ -39,6 +39,14 @@ public ref struct SpanBuf<T>(Span<T> buf)
     length += vals.Length;
     return start..length;
   }
+
+  public Span<T> Rest => buf[length..];
+  public Range AddRest(int len)
+  {
+    var start = length;
+    length += len;
+    return start..length;
+  }
 }
 
 public interface IThreadBuf

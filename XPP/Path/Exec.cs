@@ -6,6 +6,7 @@ namespace XPP.Path;
 public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
 {
   public const int MAX_SORT_NODESET = 0x10000;
+  public const int MAX_DATA_SIZE = 0x10000;
   private struct PathState
   {
     public Nav Nav;
@@ -29,42 +30,48 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
   {
     public static int Size => MAX_SORT_NODESET;
   };
+  private class DataBuf : ThreadBuf<DataBuf, char>, IThreadBuf
+  {
+    public static int Size => MAX_DATA_SIZE;
+  }
+  private class StringBuf : ThreadBuf<StringBuf, Range>, IThreadBuf
+  {
+    public static int Size => MAX_SORT_NODESET;
+  }
+  private class NumberBuf : ThreadBuf<NumberBuf, double>, IThreadBuf
+  {
+    public static int Size => MAX_SORT_NODESET;
+  }
+
+  private const string DEFAULT_DATA = "truefalseNaN0-Infinity";
+  private static readonly Range TRUE_DATA = ^0..^4;
+  private static readonly Range FALSE_DATA = ^4..^9;
+  private static readonly Range NAN_DATA = ^9..^12;
+  private static readonly Range ZERO_DATA = ^12..^13;
+  private static readonly Range PINF_DATA = ^14..^22;
+  private static readonly Range NINF_DATA = ^13..^22;
 
   public readonly XPath Path = Path;
 
   private readonly PathState[] states = new PathState[Path.Paths.Length];
   private SpanBuf<Nav> resultBuf = ResultBuf.Buf;
   private readonly Span<Nav> dedupeBuf = DedupeBuf.Span;
+  private SpanBuf<char> data = DataBuf.Buf;
+  private SpanBuf<Range> stringBuf = StringBuf.Buf;
+  private SpanBuf<double> numberBuf = NumberBuf.Buf;
 
-  public TypedValue Run(Nav ctx) => GetValue(0, ctx);
-
-  private TypedValue GetValue(int idx, Nav ctx)
+  public ReadOnlySpan<char> String(Range range)
   {
-    ref readonly var op = ref Path.Vals[idx];
-    switch (op.Type)
-    {
-      case ValOpType.Number: return new() { Type = ValueType.Number, Value = op.Value };
-      case ValOpType.String: return new() { Type = ValueType.String, Value = op.Value };
-      case ValOpType.Variable:
-        throw new NotImplementedException();
-      case ValOpType.Path:
-        ResetPath(op.Left, ctx);
-        return new() { Type = ValueType.NodeSet, Value = new() { NodeSet = op.Left } };
-      case ValOpType.Negate:
-        throw new NotImplementedException();
-      case ValOpType.And or ValOpType.Or:
-        throw new NotImplementedException();
-      case ValOpType.Eq or ValOpType.Neq or ValOpType.Lt or ValOpType.Lte or ValOpType.Gt or ValOpType.Gte:
-        throw new NotImplementedException();
-      case ValOpType.Add or ValOpType.Sub or ValOpType.Mult or ValOpType.Mod or ValOpType.Div:
-        throw new NotImplementedException();
-      case ValOpType.Func:
-        throw new NotImplementedException();
-      case ValOpType.UserFunc:
-        throw new NotImplementedException();
-      default:
-        throw new InvalidOperationException($"{op.Type}");
-    }
+    if (range.Start.IsFromEnd)
+      return DEFAULT_DATA.AsSpan()[range.Start.Value..range.End.Value];
+    return data[range];
+  }
+
+  public TypedValue Run(Nav ctx)
+  {
+    if (data.Length == 0 && Path.Data.Length > 0)
+      data.AddRange(Path.Data);
+    return GetValue(0, ctx);
   }
 
   public bool NextNode(int idx, out Nav nav)
@@ -118,7 +125,21 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
         nav = default;
         return false;
       case PathOpType.Filter:
-        throw new NotImplementedException();
+        while (NextNode(idx + 1, out state.Nav))
+        {
+          var val = GetValue(op.Filter, state.Nav);
+          if (val.Type switch
+          {
+            ValueType.Number => throw new NotImplementedException(),
+            _ => BoolValue(val),
+          })
+          {
+            nav = state.Nav.Clone();
+            return true;
+          }
+        }
+        nav = default;
+        return false;
       case PathOpType.Normalize:
         if (state.Index == -1)
         {
@@ -292,10 +313,6 @@ public interface IXPathNav<Nav> : IComparable<Nav> where Nav : IXPathNav<Nav>
   public bool NextAttribute(out Nav nav);
   public bool FirstNamespace(out Nav nav);
   public bool NextNamespace(out Nav nav);
-}
 
-public struct TypedValue
-{
-  public ValueType Type;
-  public Value Value;
+  public int StringValue(Span<char> buffer);
 }

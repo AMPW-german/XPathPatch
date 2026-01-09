@@ -202,7 +202,10 @@ public ref struct Compiler
 
   private int ReserveExpr(int idx)
   {
-    return states[idx].ValIdx = vals.Add(default);
+    ref var state = ref states[idx];
+    if (state.ValIdx != -1)
+      return state.ValIdx;
+    return state.ValIdx = vals.Add(default);
   }
 
   private int ValOpIndex(int idx)
