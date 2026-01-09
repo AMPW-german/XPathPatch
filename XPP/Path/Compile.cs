@@ -100,10 +100,7 @@ public ref struct Compiler
     IsNorm = IsOrdered | IsDeduped,
   }
 
-  private class CompileBuf<O, T> : ThreadBuf<O, T>, IThreadBuf where O : CompileBuf<O, T>
-  {
-    public static int Size => XPath.MAX_LENGTH;
-  }
+  private class CompileBuf<O, T>() : ThreadBuf<O, T>(XPath.MAX_LENGTH) where O : CompileBuf<O, T>, new();
   private class PathBuf : CompileBuf<PathBuf, PathOp>;
   private class ValBuf : CompileBuf<ValBuf, ValOp>;
   private class DataBuf : CompileBuf<DataBuf, char>;

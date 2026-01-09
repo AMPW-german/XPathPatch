@@ -49,13 +49,11 @@ public ref struct SpanBuf<T>(Span<T> buf)
   }
 }
 
-public interface IThreadBuf
+public class ThreadBuf<O, V>(int size) where O : ThreadBuf<O, V>, new()
 {
-  public static abstract int Size { get; }
-}
+  private readonly int size = size;
+  private static readonly O Instance = new();
 
-public class ThreadBuf<O, V> where O : ThreadBuf<O, V>, IThreadBuf
-{
   [ThreadStatic]
   private static V[] buffer;
 
@@ -65,7 +63,7 @@ public class ThreadBuf<O, V> where O : ThreadBuf<O, V>, IThreadBuf
   {
     get
     {
-      var size = O.Size;
+      var size = Instance.size;
       Span<V> buf = buffer ??= new V[size];
       return buf[..size];
     }

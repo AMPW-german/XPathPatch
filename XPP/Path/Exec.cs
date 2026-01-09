@@ -22,26 +22,11 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
     public bool SecondEnd;
   }
 
-  private class ResultBuf : ThreadBuf<ResultBuf, Nav>, IThreadBuf
-  {
-    public static int Size => MAX_SORT_NODESET;
-  };
-  private class DedupeBuf : ThreadBuf<DedupeBuf, Nav>, IThreadBuf
-  {
-    public static int Size => MAX_SORT_NODESET;
-  };
-  private class DataBuf : ThreadBuf<DataBuf, char>, IThreadBuf
-  {
-    public static int Size => MAX_DATA_SIZE;
-  }
-  private class StringBuf : ThreadBuf<StringBuf, Range>, IThreadBuf
-  {
-    public static int Size => MAX_SORT_NODESET;
-  }
-  private class NumberBuf : ThreadBuf<NumberBuf, double>, IThreadBuf
-  {
-    public static int Size => MAX_SORT_NODESET;
-  }
+  private class ResultBuf() : ThreadBuf<ResultBuf, Nav>(MAX_SORT_NODESET);
+  private class DedupeBuf() : ThreadBuf<DedupeBuf, Nav>(MAX_SORT_NODESET);
+  private class DataBuf() : ThreadBuf<DataBuf, char>(MAX_DATA_SIZE);
+  private class StringBuf() : ThreadBuf<StringBuf, Range>(MAX_SORT_NODESET);
+  private class NumberBuf() : ThreadBuf<NumberBuf, double>(MAX_SORT_NODESET);
 
   private const string DEFAULT_DATA = "truefalseNaN0-Infinity";
   private static readonly Range TRUE_DATA = ^0..^4;
