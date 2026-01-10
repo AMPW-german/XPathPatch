@@ -11,9 +11,9 @@ public static class Program
 {
   private const string Path = "//@id[.>0]/..";
   private const string XML = """
-    <root>
-      <a id="1">
-        <b />
+    <root xmlns:x="http://example.ns">
+      <a x:id="1">
+        <x:b />
         text
       </a>
       <?proc stuff ?>
@@ -28,7 +28,8 @@ public static class Program
     // doc.Load("C:/Program Files/Kitten Space Agency/Content/Core/DefaultAssets.xml");
 
     // TestXPath(new NavAdapter(doc.DocumentElement.CreateNavigator()));
-    TestXPDoc(doc);
+    // TestXPDoc(doc);
+    TestXPDocRead(doc);
   }
 
   private static void TestXPDoc(XmlDocument doc)
@@ -51,6 +52,30 @@ public static class Program
 
     TestXPath(xpdoc.Root(0).Nav, "//@*");
     TestXPath(xpdoc.Root(1).Nav, "//@*");
+  }
+
+  private static void TestXPDocRead(XmlDocument doc)
+  {
+    var xpdoc = XPDocument.New();
+    xpdoc.Import(doc);
+
+    Console.WriteLine($"DOC");
+    PrintReader(new XmlNodeReader(doc.DocumentElement));
+
+    Console.WriteLine($"XPDOC");
+    PrintReader(new DocReader(xpdoc.LatestRoot));
+  }
+
+  private static void PrintReader(XmlReader r)
+  {
+    while (r.Read())
+    {
+      Console.WriteLine($"- {r.NodeType} {r.Name} {r.Value}");
+      while (r.MoveToNextAttribute())
+      {
+        Console.WriteLine($"- {r.NodeType} {r.Name} {r.Value}");
+      }
+    }
   }
 
   private static void TestXPath<Nav>(Nav nav, string path = null) where Nav : IXPathNav<Nav>

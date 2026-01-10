@@ -25,32 +25,32 @@ public partial class XPDocument
     roots.Add(roots[^1]);
   }
 
-  public bool ResolveName(int context, string name, out XPName resolved)
+  public bool ResolveName(int index, int version, string name, out XPName resolved)
   {
-    var sep = name.IndexOf(':');
-    if (sep == -1)
+    XPName.Parts(name, out var prefix, out var local);
+    if (prefix.Length == 0)
     {
       resolved = new("", "", name);
       return true;
     }
 
-    return ResolveName(context, name[..sep], name[(sep + 1)..], out resolved);
+    return ResolveName(index, version, new(prefix), new(local), out resolved);
   }
 
-  public bool ResolveName(int context, string prefix, string local, out XPName resolved)
+  public bool ResolveName(int index, int version, string prefix, string local, out XPName resolved)
   {
     if (prefix == "")
     {
       resolved = new("", "", local);
       return true;
     }
-    while (context != -1)
+    while (index != -1)
     {
-      ref var node = ref nodes[context];
+      ref var node = ref nodes[index];
       var nsIdx = node.FirstAttr;
       while (nsIdx != -1)
       {
-        ref var nsNode = ref nodes[nsIdx];
+        ref var nsNode = ref Latest(nsIdx, version);
         if (nsNode.Type is XPType.Namespace && prefix == nsNode.Name.Local)
         {
           resolved = new(nsNode.Value, new(prefix), new(local));
@@ -58,7 +58,7 @@ public partial class XPDocument
         }
         nsIdx = nsNode.NextSibling;
       }
-      context = node.Parent;
+      index = node.Parent;
     }
 
     resolved = new("", prefix, local);
@@ -138,9 +138,9 @@ public partial class XPDocument
     {
       bool validName;
       if (prefixedName is XPName parsed)
-        validName = ResolveName(parent, parsed.Prefix, parsed.Local, out name);
+        validName = ResolveName(parent, docVersion, parsed.Prefix, parsed.Local, out name);
       else
-        validName = ResolveName(parent, rawName, out name);
+        validName = ResolveName(parent, docVersion, rawName, out name);
       if (!validName)
         throw new InvalidOperationException($"unknown prefix '{name.Prefix}'");
     }
@@ -327,6 +327,22 @@ public readonly struct XPName(string NsUri, string Prefix, string Local) : IEqua
   public override int GetHashCode() => HashCode.Combine(NsUri, Local);
   public static bool operator ==(XPName left, XPName right) => left.Equals(right);
   public static bool operator !=(XPName left, XPName right) => !(left == right);
+
+  public static void Parts(
+    string raw, out ReadOnlySpan<char> prefix, out ReadOnlySpan<char> local)
+  {
+    var split = raw.IndexOf(':');
+    if (split == -1)
+    {
+      prefix = [];
+      local = raw;
+    }
+    else
+    {
+      prefix = raw.AsSpan(0, split);
+      local = raw.AsSpan(split + 1);
+    }
+  }
 }
 
 public readonly partial struct XPNodeRef(XPDocument Doc, int DocVersion, int Index)
@@ -336,5 +352,5 @@ public readonly partial struct XPNodeRef(XPDocument Doc, int DocVersion, int Ind
   public readonly XPDocument Doc = Doc;
   public readonly int DocVersion = DocVersion;
   public readonly int Index = Index;
-  public bool Valid => Index >= 0;
+  public bool Valid => Index >= 0 && Doc != null;
 }

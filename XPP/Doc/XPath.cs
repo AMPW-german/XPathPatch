@@ -35,7 +35,7 @@ public struct NavAdapter(XPNodeRef node) : IXPathNav<NavAdapter>
     if (ns.SequenceEqual(name.Prefix))
       return true;
 
-    if (!node.Doc.ResolveName(node.Canon.Index, new(ns), "x", out var resolved))
+    if (!node.ResolveName(new(ns), "x", out var resolved))
       return false;
 
     return resolved.NsUri == name.NsUri;

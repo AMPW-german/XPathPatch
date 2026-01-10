@@ -90,7 +90,7 @@ public partial struct XPNodeRef
   {
     if (!Valid)
       return Invalid;
-    if (!Doc.ResolveName(Canon.Index, rawName, out var name))
+    if (!Doc.ResolveName(Canon.Index, DocVersion, rawName, out var name))
       return Invalid;
     return Attribute(name);
   }
@@ -106,4 +106,10 @@ public partial struct XPNodeRef
     }
     return Invalid;
   }
+
+  public bool ResolveName(string raw, out XPName name) =>
+    Doc.ResolveName(Canon.Index, DocVersion, raw, out name);
+
+  public bool ResolveName(string prefix, string local, out XPName name) =>
+    Doc.ResolveName(Canon.Index, DocVersion, prefix, local, out name);
 }
