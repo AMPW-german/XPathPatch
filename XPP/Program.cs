@@ -2,6 +2,7 @@
 using System;
 using System.Xml;
 using System.Xml.XPath;
+using XPP.Doc;
 using XPP.Path;
 
 namespace XPP;
@@ -15,7 +16,8 @@ public static class Program
         <b />
         text
       </a>
-      <?proc ?>
+      <?proc stuff ?>
+      <!-- comment -->
     </root>
     """;
 
@@ -23,7 +25,22 @@ public static class Program
   {
     var doc = new XmlDocument();
     doc.LoadXml(XML);
+    // doc.Load("C:/Program Files/Kitten Space Agency/Content/Core/DefaultAssets.xml");
 
+    // TestXPath(doc);
+    TestXPDoc(doc);
+  }
+
+  private static void TestXPDoc(XmlDocument doc)
+  {
+    var xpdoc = XPDocument.New();
+    xpdoc.Import(doc);
+
+    Console.WriteLine(xpdoc);
+  }
+
+  private static void TestXPath(XmlDocument doc)
+  {
     var xpath = XPath.Parse(Path);
     DebugPrint(xpath);
     var exec = new Exec<NavAdapter>(xpath);
