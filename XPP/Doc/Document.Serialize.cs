@@ -6,34 +6,36 @@ namespace XPP.Doc;
 
 public partial class XPDocument
 {
-  public override string ToString()
+  public override string ToString() => ToString(int.MaxValue);
+
+  public string ToString(int version = int.MaxValue)
   {
     var sb = new StringBuilder();
-    AddNode(roots[^1], sb, "");
+    AddNode(roots[^1], sb, "", version);
     return sb.ToString();
   }
 
-  private void AddNode(int index, StringBuilder sb, string indent)
+  private void AddNode(int index, StringBuilder sb, string indent, int version)
   {
     while (index != -1)
     {
-      ref var node = ref Latest(index);
+      ref var node = ref Latest(index, version);
       switch (node.Type)
       {
         case XPType.Document:
-          AddNode(node.FirstContent, sb, indent);
+          AddNode(node.FirstContent, sb, indent, version);
           break;
         case XPType.Element:
           sb.Append(indent).Append('<');
           sb.AppendXPName(node.Name);
-          AddNodeInline(node.FirstAttr, sb);
+          AddNodeInline(node.FirstAttr, sb, version);
           if (node.FirstContent == -1)
           {
             sb.AppendLine(" />");
             break;
           }
           sb.AppendLine(">");
-          AddNode(node.FirstContent, sb, indent + "  ");
+          AddNode(node.FirstContent, sb, indent + "  ", version);
           sb.Append(indent).Append("</").AppendXPName(node.Name).AppendLine(">");
           break;
         case XPType.Text:
@@ -56,11 +58,11 @@ public partial class XPDocument
     }
   }
 
-  private void AddNodeInline(int index, StringBuilder sb)
+  private void AddNodeInline(int index, StringBuilder sb, int version)
   {
     while (index != -1)
     {
-      ref var node = ref Latest(index);
+      ref var node = ref Latest(index, version);
       switch (node.Type)
       {
         case XPType.Namespace:
@@ -74,6 +76,24 @@ public partial class XPDocument
           throw new InvalidOperationException($"{node.Type}");
       }
       index = node.NextSibling;
+    }
+  }
+
+  public void DebugDump()
+  {
+    Console.WriteLine($"V: {docVersion}");
+    for (var i = 0; i <= docVersion; i++)
+      Console.WriteLine($"ROOT {i} {roots[i]}");
+    for (var i = 0; i < nodes.Length; i++)
+    {
+      ref var node = ref nodes[i];
+      Console.WriteLine(
+        $"NODE {i}={node.Index} {node.Type} " +
+        $"[{node.Name.NsUri}]{node.Name.Prefix}:{node.Name.Local} = '{node.Value}' " +
+        $"^{node.Parent} {node.PrevSibling}<>{node.NextSibling} " +
+        $"a{node.FirstAttr}..{node.LastAttr} c{node.FirstContent}..{node.LastContent} " +
+        $"v{node.DVersion} {node.VPrev}<>{node.VNext}"
+      );
     }
   }
 }

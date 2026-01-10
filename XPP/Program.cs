@@ -36,7 +36,18 @@ public static class Program
     var xpdoc = XPDocument.New();
     xpdoc.Import(doc);
 
-    Console.WriteLine(xpdoc);
+    xpdoc.NewVersion();
+    var parent = xpdoc.LatestRoot.FirstContent.FirstContent;
+    xpdoc.AddChild(
+      parent.Index,
+      XPType.Attribute,
+      rawName: "name",
+      value: "value"
+    );
+    Console.WriteLine(xpdoc.ToString());
+    Console.WriteLine(xpdoc.ToString(0));
+
+    // xpdoc.DebugDump();
   }
 
   private static void TestXPath(XmlDocument doc)

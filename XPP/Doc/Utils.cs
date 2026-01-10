@@ -7,8 +7,11 @@ namespace XPP.Doc;
 
 public class AppendList<T> : IEnumerable<T> where T : notnull
 {
-  private const int INITIAL_SIZE = 10;
-  private T[] values = new T[INITIAL_SIZE];
+  private const int CHUNK_SHIFT = 10;
+  private const int CHUNK_SIZE = 1 << CHUNK_SHIFT;
+  private const int CHUNK_MASK = CHUNK_SIZE - 1;
+
+  private readonly List<T[]> chunks = [];
   private int length = 0;
 
   public int Length => length;
@@ -19,54 +22,33 @@ public class AppendList<T> : IEnumerable<T> where T : notnull
     {
       if (index < 0 || index >= length)
         throw new IndexOutOfRangeException($"{index} <> [0,{length})");
-      return ref values[index];
+      
+      return ref ChunkFor(index)[index & CHUNK_MASK];
     }
   }
 
   public ref T this[Index index] => ref this[index.GetOffset(length)];
 
-  public Span<T> this[Range range]
-  {
-    get
-    {
-      var (start, len) = range.GetOffsetAndLength(length);
-      return values.AsSpan(start, len);
-    }
-  }
-
   public int Add(T val)
   {
-    EnsureCap(length + 1);
     var idx = length++;
-    values[idx] = val;
+    ChunkFor(idx)[idx & CHUNK_MASK] = val;
     return idx;
   }
 
   public int Add(ref readonly T val)
   {
-    EnsureCap(length + 1);
     var idx = length++;
-    values[idx] = val;
+    ChunkFor(idx)[idx & CHUNK_MASK] = val;
     return idx;
   }
 
-  public Range AddRange(ReadOnlySpan<T> vals)
+  private T[] ChunkFor(int index)
   {
-    EnsureCap(length + vals.Length);
-    var start = length;
-    vals.CopyTo(values.AsSpan(start));
-    length += vals.Length;
-    return start..length;
-  }
-
-  private void EnsureCap(int cap)
-  {
-    if (values.Length >= cap)
-      return;
-    var newCap = Math.Max(cap, values.Length * 2);
-    var newVals = new T[newCap];
-    values.CopyTo(newVals);
-    values = newVals;
+    var cidx = index >> CHUNK_SHIFT;
+    if (cidx == chunks.Count)
+      chunks.Add(new T[CHUNK_SIZE]);
+    return chunks[cidx];
   }
 
   public Enumerator GetEnumerator() => new(this);

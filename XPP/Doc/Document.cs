@@ -122,8 +122,10 @@ public partial class XPDocument
     if (!type.HasValue && value != "")
       throw new InvalidOperationException($"{type} node must not have value");
 
+    ref var pnode = ref nodes[parent];
+
     if (before == -1 && after == -1)
-      after = LastChild(ref nodes[parent], type);
+      after = LastChild(ref pnode, type);
 
     var (prev, next) = (-1, -1);
     if (before != -1)
@@ -145,7 +147,7 @@ public partial class XPDocument
 
     if (type.DistinctName)
     {
-      var sibIdx = FirstChild(ref nodes[parent], type);
+      var sibIdx = FirstChild(ref pnode, type);
       while (sibIdx != -1)
       {
         ref var sibling = ref nodes[sibIdx];
@@ -180,11 +182,13 @@ public partial class XPDocument
 
     // if we are first or last, we need a current parent
     if (prev == -1 || next == -1)
-      parent = Current(parent).Index;
+    {
+      pnode = ref Current(parent);
+      parent = pnode.Index;
+    }
 
     ref var node = ref NewNode(type, name, value);
     node.Parent = parent;
-    ref var pnode = ref nodes[parent];
 
     if (prev == -1)
       FirstChild(ref pnode, type) = node.Index;
@@ -325,7 +329,7 @@ public readonly struct XPName(string NsUri, string Prefix, string Local) : IEqua
   public static bool operator !=(XPName left, XPName right) => !(left == right);
 }
 
-public readonly struct XPNodeRef(XPDocument Doc, int DocVersion, int Index)
+public readonly partial struct XPNodeRef(XPDocument Doc, int DocVersion, int Index)
 {
   public static readonly XPNodeRef Invalid = new(null, 0, -1);
 
