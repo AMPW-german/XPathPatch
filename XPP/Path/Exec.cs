@@ -300,4 +300,6 @@ public interface IXPathNav<Nav> : IComparable<Nav> where Nav : IXPathNav<Nav>
   public bool NextNamespace(out Nav nav);
 
   public int StringValue(Span<char> buffer);
+
+  public string OuterXml();
 }

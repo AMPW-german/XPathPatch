@@ -1,5 +1,6 @@
 
 using System;
+using System.Text;
 
 namespace XPP.Doc;
 
@@ -55,6 +56,17 @@ public partial class XPDocument
   public XPNodeRef LastAttr(XPNodeRef of) => MakeRef(of, Lookup(of).LastAttr);
   public XPNodeRef PrevSibling(XPNodeRef of) => MakeRef(of, Lookup(of).PrevSibling);
   public XPNodeRef NextSibling(XPNodeRef of) => MakeRef(of, Lookup(of).NextSibling);
+
+  public string ToString(XPNodeRef of, string indent = "")
+  {
+    ref readonly var node = ref Lookup(of);
+    var sb = new StringBuilder();
+    if (node.Type.IsAttribute)
+      AddNodeInline(node.Index, sb, of.DocVersion, siblings: false);
+    else
+      AddNode(node.Index, sb, indent, of.DocVersion, siblings: false);
+    return sb.ToString();
+  }
 }
 
 public partial struct XPNodeRef

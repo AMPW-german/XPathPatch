@@ -15,7 +15,8 @@ public partial class XPDocument
     return sb.ToString();
   }
 
-  private void AddNode(int index, StringBuilder sb, string indent, int version)
+  private void AddNode(
+    int index, StringBuilder sb, string indent, int version, bool siblings = true)
   {
     while (index != -1)
     {
@@ -54,11 +55,14 @@ public partial class XPDocument
         default:
           throw new InvalidOperationException($"{node.Type}");
       }
+      if (!siblings)
+        break;
       index = node.NextSibling;
     }
   }
 
-  private void AddNodeInline(int index, StringBuilder sb, int version)
+  private void AddNodeInline(
+    int index, StringBuilder sb, int version, bool siblings = true)
   {
     while (index != -1)
     {
@@ -75,6 +79,8 @@ public partial class XPDocument
         default:
           throw new InvalidOperationException($"{node.Type}");
       }
+      if (!siblings)
+        break;
       index = node.NextSibling;
     }
   }

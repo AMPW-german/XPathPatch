@@ -27,7 +27,7 @@ public static class Program
     doc.LoadXml(XML);
     // doc.Load("C:/Program Files/Kitten Space Agency/Content/Core/DefaultAssets.xml");
 
-    // TestXPath(doc);
+    // TestXPath(new NavAdapter(doc.DocumentElement.CreateNavigator()));
     TestXPDoc(doc);
   }
 
@@ -48,21 +48,24 @@ public static class Program
     Console.WriteLine(xpdoc.ToString(0));
 
     // xpdoc.DebugDump();
+
+    TestXPath(xpdoc.Root(0).Nav, "//@*");
+    TestXPath(xpdoc.Root(1).Nav, "//@*");
   }
 
-  private static void TestXPath(XmlDocument doc)
+  private static void TestXPath<Nav>(Nav nav, string path = null) where Nav : IXPathNav<Nav>
   {
-    var xpath = XPath.Parse(Path);
+    var xpath = XPath.Parse(path ?? Path);
     DebugPrint(xpath);
-    var exec = new Exec<NavAdapter>(xpath);
+    var exec = new Exec<Nav>(xpath);
 
-    var val = exec.Run(new(doc.DocumentElement.CreateNavigator()));
+    var val = exec.Run(nav);
 
     var i = 0;
-    while (exec.NextNode(val.Value.NodeSet, out var nav))
+    while (exec.NextNode(val.Value.NodeSet, out nav))
     {
-      Console.WriteLine($"{i++} {nav.Node.NodeType}");
-      Console.WriteLine($"  {nav.Node.OuterXml}");
+      Console.WriteLine($"{i++} {nav.Type()} attr:{nav.IsAttribute()} ns:{nav.IsNs()}");
+      Console.WriteLine($"  {nav.OuterXml()}");
     }
   }
 
@@ -207,4 +210,6 @@ public struct NavAdapter(XPathNavigator node) : IXPathNav<NavAdapter>
     }
     return len;
   }
+
+  public string OuterXml() => Node.OuterXml;
 }
