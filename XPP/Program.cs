@@ -36,9 +36,9 @@ public static class Program
     // doc.Load(TestFile);
 
     // TestXPath(new NavAdapter(doc.DocumentElement.CreateNavigator()));
-    // TestXPDoc(doc);
+    TestXPDoc(doc);
     // TestXPDocRead(doc);
-    SpeedTest(TestFolder);
+    // SpeedTest(TestFolder);
     // TestReadCompare(TestFolder);
     // TestImportRead(TestFolder);
   }
@@ -62,7 +62,13 @@ public static class Program
     parent.SetAttribute("name", "value2");
     parent.AddAttribute("extra", "stuff");
     xpdoc.NewVersion();
+    parent.LatestVersion.Parent.Import(parent);
+    xpdoc.NewVersion();
     parent.LatestVersion.Attribute("name").Remove();
+    xpdoc.NewVersion();
+    var root = xpdoc.LatestRoot.FirstContent;
+    root.Import(root.AtVersion(^1));
+
     for (var version = 0; version <= xpdoc.Version; version++)
       Console.WriteLine(xpdoc.ToString(version));
 
@@ -82,7 +88,7 @@ public static class Program
     PrintReader(new XmlNodeReader(doc.DocumentElement));
 
     Console.WriteLine($"XPDOC");
-    PrintReader(new DocReader(xpdoc.LatestRoot));
+    PrintReader(new XPDocReader(xpdoc.LatestRoot));
   }
 
   private static void PrintReader(XmlReader r)
@@ -109,7 +115,7 @@ public static class Program
         xpdoc.Import(doc);
 
         using var r0 = new XmlNodeReader(doc.DocumentElement);
-        using var r1 = new DocReader(xpdoc.LatestRoot);
+        using var r1 = new XPDocReader(xpdoc.LatestRoot);
 
         CompareRead(file, r0, r1);
       }
@@ -135,7 +141,7 @@ public static class Program
         xpdoc.Import(XmlReader.Create(file));
 
         using var r0 = new XmlNodeReader(doc.DocumentElement);
-        using var r1 = new DocReader(xpdoc.LatestRoot);
+        using var r1 = new XPDocReader(xpdoc.LatestRoot);
 
         CompareRead(file, r0, r1);
       }

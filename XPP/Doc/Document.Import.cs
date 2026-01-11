@@ -116,11 +116,62 @@ public partial class XPDocument
 
   private static XPName PrefixedName(XmlReader reader) =>
     new("", reader.Prefix, reader.LocalName);
+
+  public XPNodeRef Import(XPNodeRef node, int parent = 0)
+  {
+    if (!node.Valid)
+      throw new InvalidOperationException($"invalid node");
+    if (node.Doc == this && node.DocVersion == docVersion && node.Type.CanHaveContent)
+    {
+      // if copying a node that can have children from the live version of this doc,
+      // check that we aren't copying into a child node
+      var nindex = node.Canon.Index;
+      ref var pnode = ref Latest(parent);
+      while (true)
+      {
+        if (pnode.Index == nindex)
+          throw new InvalidOperationException("cannot copy a parent into its child");
+        if (pnode.Parent == -1)
+          break;
+        pnode = ref Latest(pnode.Parent);
+      }
+    }
+    return ImportInternal(node, parent, false);
+  }
+
+  private XPNodeRef ImportInternal(XPNodeRef node, int parent, bool siblings)
+  {
+    var inode = XPNodeRef.Invalid;
+    while (node.Valid)
+    {
+      inode = AddChild(parent, node.Type, prefixedName: node.Name, value: node.Value);
+      ImportInternal(node.FirstAttr, inode.Index, true);
+      ImportInternal(node.FirstContent, inode.Index, true);
+      if (!siblings)
+        return inode;
+      node = node.NextSibling;
+    }
+    return inode;
+  }
 }
 
 public partial struct XPNodeRef
 {
   public XPNodeRef Import(XmlNode node)
+  {
+    if (DocVersion != Doc.Version)
+      throw new InvalidOperationException($"Cannot import to previous version");
+    return Doc.Import(node, Canon.Index);
+  }
+
+  public XPNodeRef Import(XmlReader reader, bool interior = false)
+  {
+    if (DocVersion != Doc.Version)
+      throw new InvalidOperationException($"Cannot import to previous version");
+    return Doc.Import(reader, Canon.Index, interior);
+  }
+
+  public XPNodeRef Import(XPNodeRef node)
   {
     if (DocVersion != Doc.Version)
       throw new InvalidOperationException($"Cannot import to previous version");

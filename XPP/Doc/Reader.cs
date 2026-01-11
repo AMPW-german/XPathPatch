@@ -4,7 +4,7 @@ using System.Xml;
 
 namespace XPP.Doc;
 
-public class DocReader(XPNodeRef _node) : XmlReader
+public class XPDocReader(XPNodeRef _node) : XmlReader
 {
   private readonly NameTable nt = new();
   private State state = State.Init(_node);

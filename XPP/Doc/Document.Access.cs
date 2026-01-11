@@ -132,6 +132,8 @@ public partial struct XPNodeRef
   public XPNodeRef FirstVersion => Doc?.FirstVersion(this) ?? Invalid;
   public XPNodeRef LatestVersion => Doc?.LatestVersion(this) ?? Invalid;
   public XPNodeRef AtVersion(int version) => Doc?.AtVersion(this, version) ?? Invalid;
+  public XPNodeRef AtVersion(Index version) =>
+    Doc?.AtVersion(this, version.GetOffset(Doc.Version)) ?? Invalid;
 
   public XPNodeRef AddChild(
     XPType type, string name, string value = null,
