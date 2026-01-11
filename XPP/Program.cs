@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Xml;
 using System.Xml.XPath;
@@ -37,9 +38,9 @@ public static class Program
     // TestXPath(new NavAdapter(doc.DocumentElement.CreateNavigator()));
     // TestXPDoc(doc);
     // TestXPDocRead(doc);
-    // SpeedTest(TestFolder);
-
-    TestReadCompare(TestFolder);
+    SpeedTest(TestFolder);
+    // TestReadCompare(TestFolder);
+    // TestImportRead(TestFolder);
   }
 
   private static void TestXPDoc(XmlDocument doc)
@@ -102,7 +103,15 @@ public static class Program
     {
       try
       {
-        CompareRead(file);
+        var doc = new XmlDocument();
+        doc.Load(file);
+        var xpdoc = XPDocument.New();
+        xpdoc.Import(doc);
+
+        using var r0 = new XmlNodeReader(doc.DocumentElement);
+        using var r1 = new DocReader(xpdoc.LatestRoot);
+
+        CompareRead(file, r0, r1);
       }
       catch
       {
@@ -114,18 +123,43 @@ public static class Program
     }
   }
 
-  private static void CompareRead(string file)
+  private static void TestImportRead(string basePath)
+  {
+    foreach (var file in Directory.EnumerateFiles(basePath, "*.xml", SearchOption.AllDirectories))
+    {
+      try
+      {
+        var doc = new XmlDocument();
+        doc.Load(file);
+        var xpdoc = XPDocument.New();
+        xpdoc.Import(XmlReader.Create(file));
+
+        using var r0 = new XmlNodeReader(doc.DocumentElement);
+        using var r1 = new DocReader(xpdoc.LatestRoot);
+
+        CompareRead(file, r0, r1);
+      }
+      catch
+      {
+        var doc = new XmlDocument();
+        doc.Load(file);
+        TestXPDocRead(doc);
+        throw;
+      }
+    }
+  }
+
+  private static void CompareRead(string file, XmlReader r0, XmlReader r1)
   {
     var doc = new XmlDocument();
     doc.Load(file);
     var xpdoc = XPDocument.New();
     xpdoc.Import(doc);
 
-    using var r0 = new XmlNodeReader(doc.DocumentElement);
-    using var r1 = new DocReader(xpdoc.LatestRoot);
-
     var e0 = false;
     var e1 = false;
+
+    static string norm(string str) => str.Replace("\r\n", "\n");
 
     while (true)
     {
@@ -151,8 +185,8 @@ public static class Program
       e0 = r0.IsEmptyElement;
       e1 = r1.IsEmptyElement;
 
-      var inf0 = (r0.NodeType, r0.NamespaceURI, r0.Prefix, r0.LocalName, r0.Value);
-      var inf1 = (r1.NodeType, r1.NamespaceURI, r1.Prefix, r1.LocalName, r1.Value);
+      var inf0 = (r0.NodeType, r0.NamespaceURI, r0.Prefix, r0.LocalName, norm(r0.Value));
+      var inf1 = (r1.NodeType, r1.NamespaceURI, r1.Prefix, r1.LocalName, norm(r1.Value));
 
       AssertEqual("Node", file, inf0, inf1);
 
@@ -166,8 +200,8 @@ public static class Program
         if (!a0)
           break;
 
-        var ainf0 = (r0.NodeType, r0.NamespaceURI, r0.Prefix, r0.LocalName, r0.Value);
-        var ainf1 = (r1.NodeType, r1.NamespaceURI, r1.Prefix, r1.LocalName, r1.Value);
+        var ainf0 = (r0.NodeType, r0.NamespaceURI, r0.Prefix, r0.LocalName, norm(r0.Value));
+        var ainf1 = (r1.NodeType, r1.NamespaceURI, r1.Prefix, r1.LocalName, norm(r1.Value));
 
         AssertEqual("Attr", file, ainf0, ainf1);
       }
@@ -191,9 +225,13 @@ public static class Program
       }
       else if (typeof(T) == typeof(string))
       {
-        sb.Append(l as string ?? "<null>");
+        var ls = l as string;
+        var rs = r as string;
+        sb.Append('"').Append(ls ?? "<null>").Append('"');
+        sb.Append('[').Append(ls?.Length ?? 0).Append(']');
         sb.Append('/');
-        sb.Append(r as string ?? "<null>");
+        sb.Append('"').Append(rs ?? "<null>").Append('"');
+        sb.Append('[').Append(rs?.Length ?? 0).Append(']');
       }
       else
         sb.Append(l).Append('/').Append(r);
@@ -215,6 +253,7 @@ public static class Program
   {
     var stopwatch = Stopwatch.StartNew();
     var docs = new List<XmlDocument>();
+    // var rawDocs = new List<byte[]>();
     foreach (var file in Directory.EnumerateFiles(basePath, "*.xml", SearchOption.AllDirectories))
     {
       if (file.Contains("\\Language\\"))
@@ -222,6 +261,7 @@ public static class Program
       var doc = new XmlDocument();
       doc.Load(file);
       docs.Add(doc);
+      // rawDocs.Add(File.ReadAllBytes(file));
     }
     stopwatch.Stop();
     Console.WriteLine($"loaded {docs.Count} files in {stopwatch.Elapsed.TotalMilliseconds:0.##}ms");
@@ -234,14 +274,19 @@ public static class Program
       var xpdoc = XPDocument.New();
       var root = xpdoc.AddChild(0, XPType.Element, "Root");
       foreach (var doc in docs)
+      // foreach (var doc in rawDocs)
       {
         xpdoc.NewVersion();
         xpdoc.Import(doc, root.LatestVersion.Index);
+        // xpdoc.Import(
+        //   XmlReader.Create(new MemoryStream(doc)),
+        //   root.LatestVersion.Index);
       }
       total += xpdoc.TotalNodes;
     }
     stopwatch.Stop();
     Console.WriteLine($"imported {docs.Count * ITER_COUNT} docs with {total} nodes in {stopwatch.Elapsed.TotalMilliseconds:0.##}ms");
+    // Console.WriteLine($"imported {rawDocs.Count * ITER_COUNT} docs with {total} nodes in {stopwatch.Elapsed.TotalMilliseconds:0.##}ms");
   }
 
   private static void TestXPath<Nav>(Nav nav, string path = null) where Nav : IXPathNav<Nav>

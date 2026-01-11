@@ -49,6 +49,73 @@ public partial class XPDocument
 
   private static XPName PrefixedName(XmlNode node) =>
     new("", node.Prefix, node.LocalName);
+
+  public XPNodeRef Import(XmlReader reader, int parent = 0, bool interior = false)
+  {
+    if (reader.Settings?.IgnoreWhitespace != true)
+      reader = XmlReader.Create(reader, new() { IgnoreWhitespace = true });
+    while (reader.Read())
+    {
+      if (interior || reader.NodeType == XmlNodeType.Element)
+        return ImportInternal(reader, parent);
+    }
+    throw new InvalidOperationException($"Unexpected EOF");
+  }
+
+  private XPNodeRef ImportInternal(XmlReader reader, int parent)
+  {
+    switch (reader.NodeType)
+    {
+      case XmlNodeType.Element:
+        return ImportElement(reader, parent);
+      case XmlNodeType.Attribute:
+        return AddChild(parent,
+          reader.Prefix == XMLNS_PREFIX ? XPType.Namespace : XPType.Attribute,
+          prefixedName: PrefixedName(reader), value: reader.Value);
+      case XmlNodeType.Text:
+        return AddChild(parent, XPType.Text, value: reader.Value);
+      case XmlNodeType.CDATA:
+        return AddChild(parent, XPType.CData, value: reader.Value);
+      case XmlNodeType.ProcessingInstruction:
+        return AddChild(
+          parent, XPType.CData, prefixedName: PrefixedName(reader), value: reader.Value);
+      case XmlNodeType.Comment:
+        return AddChild(parent, XPType.Comment, value: reader.Value);
+      case XmlNodeType.EndElement:
+        // shouldn't get End element here
+        throw new InvalidOperationException();
+      case XmlNodeType.Whitespace:
+        return XPNodeRef.Invalid;
+      case XmlNodeType.XmlDeclaration:
+      default:
+        throw new NotImplementedException($"{reader.NodeType}");
+    }
+  }
+
+  private XPNodeRef ImportElement(XmlReader reader, int parent)
+  {
+    var el = AddChild(parent, XPType.Element, prefixedName: PrefixedName(reader));
+    if (reader.MoveToFirstAttribute())
+    {
+      do
+      {
+        ImportInternal(reader, el.Index);
+      } while (reader.MoveToNextAttribute());
+      reader.MoveToElement();
+    }
+    if (reader.IsEmptyElement)
+      return el;
+    while (reader.Read())
+    {
+      if (reader.NodeType == XmlNodeType.EndElement)
+        return el;
+      ImportInternal(reader, el.Index);
+    }
+    throw new InvalidOperationException($"unexpected EOF");
+  }
+
+  private static XPName PrefixedName(XmlReader reader) =>
+    new("", reader.Prefix, reader.LocalName);
 }
 
 public partial struct XPNodeRef
