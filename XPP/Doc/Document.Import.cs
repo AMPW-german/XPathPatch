@@ -13,11 +13,8 @@ public partial class XPDocument
       case XmlNodeType.Element when node is XmlElement el:
         return ImportElement(el, parent);
       case XmlNodeType.Attribute when node is XmlAttribute attr:
-        if (attr.Prefix != "xmlns")
-          return AddChild(parent, XPType.Attribute,
-            prefixedName: PrefixedName(node), value: attr.Value);
-        return AddChild(parent, XPType.Namespace,
-          rawName: attr.LocalName, value: attr.Value);
+        return AddChild(parent, attr.Prefix == "xmlns" ? XPType.Namespace : XPType.Attribute,
+          prefixedName: PrefixedName(node), value: attr.Value);
       case XmlNodeType.Text:
         return AddChild(parent, XPType.Text, value: node.Value);
       case XmlNodeType.CDATA:
@@ -50,3 +47,15 @@ public partial class XPDocument
   private static XPName PrefixedName(XmlNode node) =>
     new("", node.Prefix, node.LocalName);
 }
+
+public partial struct XPNodeRef
+{
+  public XPNodeRef Import(XmlNode node)
+  {
+    if (DocVersion != Doc.Version)
+      throw new InvalidOperationException($"Cannot import to previous version");
+    return Doc.Import(node, Canon.Index);
+  }
+}
+
+// TODO: add DeletedVersion to Node. handle in Latest/Current

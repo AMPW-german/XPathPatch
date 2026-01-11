@@ -28,8 +28,8 @@ public static class Program
     // doc.Load("C:/Program Files/Kitten Space Agency/Content/Core/DefaultAssets.xml");
 
     // TestXPath(new NavAdapter(doc.DocumentElement.CreateNavigator()));
-    // TestXPDoc(doc);
-    TestXPDocRead(doc);
+    TestXPDoc(doc);
+    // TestXPDocRead(doc);
   }
 
   private static void TestXPDoc(XmlDocument doc)
@@ -50,8 +50,9 @@ public static class Program
 
     // xpdoc.DebugDump();
 
-    TestXPath(xpdoc.Root(0).Nav, "//@*");
-    TestXPath(xpdoc.Root(1).Nav, "//@*");
+    const string path = "(//@* | //namespace::*)";
+    TestXPath(xpdoc.Root(0).Nav, path);
+    TestXPath(xpdoc.Root(1).Nav, path);
   }
 
   private static void TestXPDocRead(XmlDocument doc)

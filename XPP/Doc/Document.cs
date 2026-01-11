@@ -33,6 +33,11 @@ public partial class XPDocument
       resolved = new("", "", name);
       return true;
     }
+    if (prefix.SequenceEqual("xmlns"))
+    {
+      resolved = new("xmlns", "xmlns", new(local));
+      return true;
+    }
 
     return ResolveName(index, version, new(prefix), new(local), out resolved);
   }
@@ -42,6 +47,11 @@ public partial class XPDocument
     if (prefix == "")
     {
       resolved = new("", "", local);
+      return true;
+    }
+    if (prefix == "xmlns")
+    {
+      resolved = new("xmlns", "xmlns", local);
       return true;
     }
     while (index != -1)
@@ -143,6 +153,11 @@ public partial class XPDocument
         validName = ResolveName(parent, docVersion, rawName, out name);
       if (!validName)
         throw new InvalidOperationException($"unknown prefix '{name.Prefix}'");
+
+      if (type is XPType.Namespace && name.Prefix != "xmlns")
+        throw new InvalidOperationException($"Namespace must have xmlns prefix");
+      if (type is XPType.Attribute && name.Prefix == "xmlns")
+        throw new InvalidOperationException($"Attribute must not have prefix xmlns");
     }
 
     if (type.DistinctName)
