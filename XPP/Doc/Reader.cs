@@ -31,7 +31,7 @@ public class DocReader(XPNodeRef _node) : XmlReader
   public override bool EOF => state.Started && !state.Valid;
 
   public override bool IsEmptyElement =>
-    state.Node.Type is XPType.Element && !state.FirstContent().Valid;
+    state.Node.Type is XPType.Element && !state.End && !state.FirstContent().Valid;
 
   public override string LocalName => state.Node.Name.Local;
 
@@ -59,8 +59,7 @@ public class DocReader(XPNodeRef _node) : XmlReader
     }
   }
 
-  public override string Prefix =>
-    state.Node.Type is XPType.Namespace ? "xmlns" : state.Node.Name.Prefix ?? "";
+  public override string Prefix => state.Node.Name.Prefix;
 
   public override ReadState ReadState =>
     state.Started
@@ -90,7 +89,7 @@ public class DocReader(XPNodeRef _node) : XmlReader
   {
     XPName.Parts(name, out var prefix, out var local);
     var attr = state.FirstAttr();
-    var isNs = prefix == "xmlns";
+    var isNs = prefix == XPDocument.XMLNS_PREFIX;
     while (attr.Valid)
     {
       var aname = attr.Node.Name;
@@ -130,8 +129,11 @@ public class DocReader(XPNodeRef _node) : XmlReader
 
   public override string LookupNamespace(string prefix)
   {
-    if (prefix is "" or "xml" or "xmlns")
+    // TODO: xml prefix uri
+    if (prefix is "" or "xml")
       return prefix;
+    if (prefix is XPDocument.XMLNS_PREFIX)
+      return XPDocument.XMLNS_URI;
     if (!state.Node.ResolveName(prefix, "", out var name))
       return null;
     return name.NsUri;

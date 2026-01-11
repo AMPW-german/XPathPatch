@@ -70,7 +70,7 @@ public partial class XPDocument
       switch (node.Type)
       {
         case XPType.Namespace:
-          sb.Append(' ').AppendXPName("xmlns", node.Name.Local);
+          sb.Append(' ').AppendXPName(node.Name);
           sb.Append('=').AppendQuoted(node.Value);
           break;
         case XPType.Attribute:

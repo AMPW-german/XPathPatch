@@ -6,25 +6,24 @@ namespace XPP.Doc;
 
 public partial class XPDocument
 {
-  private XPNodeRef MakeRef(XPNodeRef from, int index)
-  {
-    if (!from.Valid || index == -1)
-      return XPNodeRef.Invalid;
-    return new(this, from.DocVersion, index);
-  }
+  private XPNodeRef MakeRef(XPNodeRef from, int index) =>
+    MakeRefAt(from.DocVersion, index);
 
   private XPNodeRef MakeRefExact(int index)
   {
     if (index == -1)
       return XPNodeRef.Invalid;
-    return new(this, nodes[index].DVersion, index);
+    return MakeRefAt(nodes[index].DVersion, index);
   }
 
   private XPNodeRef MakeRefAt(int version, int index)
   {
     if (index == -1)
       return XPNodeRef.Invalid;
-    return new(this, version, Latest(index, version).Index);
+    ref var node = ref Latest(index, version);
+    if (node.Removed)
+      return XPNodeRef.Invalid;
+    return new(this, version, node.Index);
   }
 
   private static readonly Node InvalidNode = new()
@@ -41,6 +40,7 @@ public partial class XPDocument
     DVersion = -1,
     VPrev = -1,
     VNext = -1,
+    Removed = true,
   };
 
   private ref readonly Node Lookup(XPNodeRef node)
@@ -94,6 +94,8 @@ public partial class XPDocument
     ref var node = ref Latest(of.Index, of.DocVersion);
     if (!node.Type.HasValue)
       throw new InvalidOperationException($"cannot set value of {node.Type} node");
+    if (node.Removed)
+      throw new InvalidOperationException($"node has been removed");
     node = ref Current(node.Index);
     node.Value = value;
   }
@@ -162,6 +164,8 @@ public partial struct XPNodeRef
   ) => AddChild(XPType.Attribute, name, value: value, before: before, after: after);
 
   public void SetValue(string value) => Doc.SetValue(this, value);
+
+  public void Remove() => Doc.RemoveNode(Canon.Index);
 
   public bool SameAs(XPNodeRef other) => Valid && Canon.Index == other.Canon.Index;
 

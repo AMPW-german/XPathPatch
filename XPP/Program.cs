@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Xml;
 using System.Xml.XPath;
 using XPP.Doc;
@@ -24,16 +25,21 @@ public static class Program
     </root>
     """;
 
+  private const string TestFile = "C:\\Program Files\\Kitten Space Agency\\Content\\Core\\DefaultAssets.xml";
+  private const string TestFolder = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Stationeers\\rocketstation_Data\\StreamingAssets";
+
   public static void Main(string[] args)
   {
     var doc = new XmlDocument();
     doc.LoadXml(XML);
-    // doc.Load("C:/Program Files/Kitten Space Agency/Content/Core/DefaultAssets.xml");
+    // doc.Load(TestFile);
 
     // TestXPath(new NavAdapter(doc.DocumentElement.CreateNavigator()));
-    TestXPDoc(doc);
+    // TestXPDoc(doc);
     // TestXPDocRead(doc);
-    // SpeedTest("C://Program Files (x86)/Steam/steamapps/common/Stationeers/rocketstation_Data/StreamingAssets");
+    // SpeedTest(TestFolder);
+
+    TestReadCompare(TestFolder);
   }
 
   private static void TestXPDoc(XmlDocument doc)
@@ -51,10 +57,13 @@ public static class Program
     // );
     parent.SetAttribute("name", "value");
     xpdoc.NewVersion();
-    parent.LatestVersion.SetAttribute("name", "value2");
-    Console.WriteLine(xpdoc.ToString());
-    Console.WriteLine(xpdoc.ToString(1));
-    Console.WriteLine(xpdoc.ToString(0));
+    parent = parent.LatestVersion;
+    parent.SetAttribute("name", "value2");
+    parent.AddAttribute("extra", "stuff");
+    xpdoc.NewVersion();
+    parent.LatestVersion.Attribute("name").Remove();
+    for (var version = 0; version <= xpdoc.Version; version++)
+      Console.WriteLine(xpdoc.ToString(version));
 
     // xpdoc.DebugDump();
 
@@ -85,6 +94,121 @@ public static class Program
         Console.WriteLine($"- {r.NodeType} {r.Name} {r.Value}");
       }
     }
+  }
+
+  private static void TestReadCompare(string basePath)
+  {
+    foreach (var file in Directory.EnumerateFiles(basePath, "*.xml", SearchOption.AllDirectories))
+    {
+      try
+      {
+        CompareRead(file);
+      }
+      catch
+      {
+        var doc = new XmlDocument();
+        doc.Load(file);
+        TestXPDocRead(doc);
+        throw;
+      }
+    }
+  }
+
+  private static void CompareRead(string file)
+  {
+    var doc = new XmlDocument();
+    doc.Load(file);
+    var xpdoc = XPDocument.New();
+    xpdoc.Import(doc);
+
+    using var r0 = new XmlNodeReader(doc.DocumentElement);
+    using var r1 = new DocReader(xpdoc.LatestRoot);
+
+    var e0 = false;
+    var e1 = false;
+
+    while (true)
+    {
+      if (e0 && !e1)
+      {
+        if (!r1.Read() || r1.NodeType != XmlNodeType.EndElement)
+          throw new InvalidOperationException($"empty mismatch {e0}/{e1} in {file}");
+      }
+      else if (!e0 && e1)
+      {
+        if (!r0.Read() || r0.NodeType != XmlNodeType.EndElement)
+          throw new InvalidOperationException($"empty mismatch {e0}/{e1} in {file}");
+      }
+
+      var n0 = r0.Read();
+      var n1 = r1.Read();
+      if (n0 != n1)
+        throw new InvalidOperationException($"Read mismatch {n0}/{n1} in {file}");
+
+      if (!n0)
+        break;
+
+      e0 = r0.IsEmptyElement;
+      e1 = r1.IsEmptyElement;
+
+      var inf0 = (r0.NodeType, r0.NamespaceURI, r0.Prefix, r0.LocalName, r0.Value);
+      var inf1 = (r1.NodeType, r1.NamespaceURI, r1.Prefix, r1.LocalName, r1.Value);
+
+      AssertEqual("Node", file, inf0, inf1);
+
+      while (true)
+      {
+        var a0 = r0.MoveToNextAttribute();
+        var a1 = r1.MoveToNextAttribute();
+
+        if (a0 != a1)
+          throw new InvalidOperationException($"NextAttr mismatch {a0}/{a1} in {file}");
+        if (!a0)
+          break;
+
+        var ainf0 = (r0.NodeType, r0.NamespaceURI, r0.Prefix, r0.LocalName, r0.Value);
+        var ainf1 = (r1.NodeType, r1.NamespaceURI, r1.Prefix, r1.LocalName, r1.Value);
+
+        AssertEqual("Attr", file, ainf0, ainf1);
+      }
+    }
+  }
+
+  private static void AssertEqual<T1, T2, T3, T4, T5>(string type, string file, (T1, T2, T3, T4, T5) v1, (T1, T2, T3, T4, T5) v2)
+  {
+    if (EqualityComparer<(T1, T2, T3, T4, T5)>.Default.Equals(v1, v2))
+      return;
+
+    var sb = new StringBuilder();
+    sb.Append(type).Append(" mismatch (");
+
+    void addCmp<T>(T l, T r)
+    {
+      if (EqualityComparer<T>.Default.Equals(l, r))
+      {
+        sb.Append(l);
+        return;
+      }
+      else if (typeof(T) == typeof(string))
+      {
+        sb.Append(l as string ?? "<null>");
+        sb.Append('/');
+        sb.Append(r as string ?? "<null>");
+      }
+      else
+        sb.Append(l).Append('/').Append(r);
+    }
+    addCmp(v1.Item1, v2.Item1);
+    sb.Append(", ");
+    addCmp(v1.Item2, v2.Item2);
+    sb.Append(", ");
+    addCmp(v1.Item3, v2.Item3);
+    sb.Append(", ");
+    addCmp(v1.Item4, v2.Item4);
+    sb.Append(", ");
+    addCmp(v1.Item5, v2.Item5);
+    sb.Append(") in ").Append(file);
+    throw new InvalidOperationException(sb.ToString());
   }
 
   private static void SpeedTest(string basePath)

@@ -5,6 +5,9 @@ namespace XPP.Doc;
 
 public partial class XPDocument
 {
+  public const string XMLNS_PREFIX = "xmlns";
+  public const string XMLNS_URI = "http://www.w3.org/2000/xmlns/";
+
   private readonly AppendList<Node> nodes = [];
   private readonly AppendList<int> roots = [];
   private int docVersion = 0;
@@ -34,9 +37,9 @@ public partial class XPDocument
       resolved = new("", "", name);
       return true;
     }
-    if (prefix.SequenceEqual("xmlns"))
+    if (prefix.SequenceEqual(XMLNS_PREFIX))
     {
-      resolved = new("xmlns", "xmlns", new(local));
+      resolved = new(XMLNS_URI, XMLNS_PREFIX, new(local));
       return true;
     }
 
@@ -50,9 +53,9 @@ public partial class XPDocument
       resolved = new("", "", local);
       return true;
     }
-    if (prefix == "xmlns")
+    if (prefix == XMLNS_PREFIX)
     {
-      resolved = new("xmlns", "xmlns", local);
+      resolved = new(XMLNS_URI, XMLNS_PREFIX, local);
       return true;
     }
     while (index != -1)
@@ -82,6 +85,8 @@ public partial class XPDocument
       throw new InvalidOperationException($"cannot specify both before and after nodes");
 
     ref var pnode = ref Latest(parent);
+    if (pnode.Removed)
+      throw new InvalidOperationException($"parent has been removed");
     if (pnode.Index != parent)
       throw new InvalidOperationException($"parent is not latest version");
 
@@ -94,6 +99,8 @@ public partial class XPDocument
     if (before != -1)
     {
       ref var bnode = ref Latest(before);
+      if (bnode.Removed)
+        throw new InvalidOperationException($"before has been removed");
       if (bnode.Index != before)
         throw new InvalidOperationException($"before is not latest version");
       if (Latest(bnode.Parent).Index != parent)
@@ -105,6 +112,8 @@ public partial class XPDocument
     if (after != -1)
     {
       ref var anode = ref Latest(after);
+      if (anode.Removed)
+        throw new InvalidOperationException($"after has been removed");
       if (anode.Index != after)
         throw new InvalidOperationException($"after is not latest version");
       if (Latest(anode.Parent).Index != parent)
@@ -144,7 +153,7 @@ public partial class XPDocument
     if (after != -1)
       (prev, next) = (after, Latest(after).NextSibling);
 
-    XPName name = default;
+    XPName name;
     if (type.HasName)
     {
       bool validName;
@@ -155,11 +164,13 @@ public partial class XPDocument
       if (!validName)
         throw new InvalidOperationException($"unknown prefix '{name.Prefix}'");
 
-      if (type is XPType.Namespace && name.Prefix != "xmlns")
-        throw new InvalidOperationException($"Namespace must have xmlns prefix");
-      if (type is XPType.Attribute && name.Prefix == "xmlns")
-        throw new InvalidOperationException($"Attribute must not have prefix xmlns");
+      if (type is XPType.Namespace && name.Prefix != XMLNS_PREFIX)
+        throw new InvalidOperationException($"Namespace must have {XMLNS_PREFIX} prefix");
+      if (type is XPType.Attribute && name.Prefix == XMLNS_PREFIX)
+        throw new InvalidOperationException($"Attribute must not have prefix {XMLNS_PREFIX}");
     }
+    else
+      name = new("", "", "");
 
     if (type.DistinctName)
     {
@@ -227,6 +238,62 @@ public partial class XPDocument
     return new(this, docVersion, node.Index);
   }
 
+  public void RemoveNode(int index)
+  {
+    ref var node = ref nodes[index];
+    if (node.VNext != -1)
+      throw new InvalidOperationException($"node is not latest version");
+    if (node.Removed)
+      throw new InvalidOperationException($"node has already been removed");
+    if (node.Parent == -1)
+      throw new InvalidOperationException($"cannot remove root document node");
+    TombstoneTree(index);
+
+    node = ref Latest(index);
+    if (node.Parent != -1 && (node.PrevSibling == -1 || node.NextSibling == -1))
+    {
+      ref var pnode = ref Current(node.Parent);
+      if (node.Type.IsAttribute)
+      {
+        if (node.PrevSibling == -1)
+          pnode.FirstAttr = node.NextSibling;
+        if (node.NextSibling == -1)
+          pnode.LastAttr = node.PrevSibling;
+      }
+      else if (node.Type.IsContent)
+      {
+        if (node.PrevSibling == -1)
+          pnode.FirstContent = node.NextSibling;
+        if (node.NextSibling == -1)
+          pnode.LastContent = node.PrevSibling;
+      }
+    }
+    if (node.PrevSibling != -1)
+    {
+      ref var prev = ref Current(node.PrevSibling);
+      prev.NextSibling = node.NextSibling;
+    }
+    if (node.NextSibling != -1)
+    {
+      ref var next = ref Current(node.NextSibling);
+      next.PrevSibling = node.PrevSibling;
+    }
+  }
+
+  private void TombstoneTree(int index, bool siblings = false)
+  {
+    if (index == -1)
+      return;
+    do
+    {
+      ref var node = ref Current(index);
+      node.Removed = true;
+      TombstoneTree(node.FirstAttr, true);
+      TombstoneTree(node.FirstContent, true);
+      index = node.NextSibling;
+    } while (siblings && index != -1);
+  }
+
   private ref Node Latest(int index, int maxVersion = int.MaxValue)
   {
     ref var node = ref nodes[index];
@@ -282,6 +349,8 @@ public partial class XPDocument
 
       VPrev = -1,
       VNext = -1,
+
+      Removed = false,
     });
     ref var node = ref nodes[idx];
     node.Index = idx;
@@ -329,6 +398,9 @@ public partial class XPDocument
     // node list indices of versions of this node
     public int VPrev;
     public int VNext;
+
+    // remove flag
+    public bool Removed;
   }
 }
 

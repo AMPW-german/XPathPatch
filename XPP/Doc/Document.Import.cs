@@ -13,7 +13,7 @@ public partial class XPDocument
       case XmlNodeType.Element when node is XmlElement el:
         return ImportElement(el, parent);
       case XmlNodeType.Attribute when node is XmlAttribute attr:
-        return AddChild(parent, attr.Prefix == "xmlns" ? XPType.Namespace : XPType.Attribute,
+        return AddChild(parent, attr.Prefix == XMLNS_PREFIX ? XPType.Namespace : XPType.Attribute,
           prefixedName: PrefixedName(node), value: attr.Value);
       case XmlNodeType.Text:
         return AddChild(parent, XPType.Text, value: node.Value);
@@ -60,5 +60,3 @@ public partial struct XPNodeRef
     return Doc.Import(node, Canon.Index);
   }
 }
-
-// TODO: add DeletedVersion to Node. handle in Latest/Current
