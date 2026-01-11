@@ -38,9 +38,12 @@ public partial class XPDocument
     var attrs = el.Attributes;
     for (var i = 0; i < attrs.Count; i++)
       Import(attrs[i], elRef.Index);
-    var children = el.ChildNodes;
-    for (var i = 0; i < children.Count; i++)
-      Import(children[i], elRef.Index);
+    var child = el.FirstChild;
+    while (child != null)
+    {
+      Import(child, elRef.Index);
+      child = child.NextSibling;
+    }
     return elRef;
   }
 

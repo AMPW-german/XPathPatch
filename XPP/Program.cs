@@ -1,5 +1,8 @@
 
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Xml;
 using System.Xml.XPath;
 using XPP.Doc;
@@ -28,8 +31,9 @@ public static class Program
     // doc.Load("C:/Program Files/Kitten Space Agency/Content/Core/DefaultAssets.xml");
 
     // TestXPath(new NavAdapter(doc.DocumentElement.CreateNavigator()));
-    TestXPDoc(doc);
+    // TestXPDoc(doc);
     // TestXPDocRead(doc);
+    SpeedTest("C://Program Files (x86)/Steam/steamapps/common/Stationeers/rocketstation_Data/StreamingAssets");
   }
 
   private static void TestXPDoc(XmlDocument doc)
@@ -77,6 +81,39 @@ public static class Program
         Console.WriteLine($"- {r.NodeType} {r.Name} {r.Value}");
       }
     }
+  }
+
+  private static void SpeedTest(string basePath)
+  {
+    var stopwatch = Stopwatch.StartNew();
+    var docs = new List<XmlDocument>();
+    foreach (var file in Directory.EnumerateFiles(basePath, "*.xml", SearchOption.AllDirectories))
+    {
+      if (file.Contains("\\Language\\"))
+        continue;
+      var doc = new XmlDocument();
+      doc.Load(file);
+      docs.Add(doc);
+    }
+    stopwatch.Stop();
+    Console.WriteLine($"loaded {docs.Count} files in {stopwatch.Elapsed.TotalMilliseconds:0.##}ms");
+
+    stopwatch.Restart();
+    const int ITER_COUNT = 100;
+    var total = 0;
+    for (var i = 0; i < ITER_COUNT; i++)
+    {
+      var xpdoc = XPDocument.New();
+      var root = xpdoc.AddChild(0, XPType.Element, "Root");
+      foreach (var doc in docs)
+      {
+        xpdoc.NewVersion();
+        xpdoc.Import(doc, root.LatestVersion.Index);
+      }
+      total += xpdoc.TotalNodes;
+    }
+    stopwatch.Stop();
+    Console.WriteLine($"imported {docs.Count*ITER_COUNT} docs with {total} nodes in {stopwatch.Elapsed.TotalMilliseconds:0.##}ms");
   }
 
   private static void TestXPath<Nav>(Nav nav, string path = null) where Nav : IXPathNav<Nav>

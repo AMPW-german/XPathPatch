@@ -22,8 +22,7 @@ public class AppendList<T> : IEnumerable<T> where T : notnull
     {
       if (index < 0 || index >= length)
         throw new IndexOutOfRangeException($"{index} <> [0,{length})");
-      
-      return ref ChunkFor(index)[index & CHUNK_MASK];
+      return ref Ref(index);
     }
   }
 
@@ -32,23 +31,28 @@ public class AppendList<T> : IEnumerable<T> where T : notnull
   public int Add(T val)
   {
     var idx = length++;
-    ChunkFor(idx)[idx & CHUNK_MASK] = val;
+    Ref(idx) = val;
     return idx;
   }
 
   public int Add(ref readonly T val)
   {
     var idx = length++;
-    ChunkFor(idx)[idx & CHUNK_MASK] = val;
+    Ref(idx) = val;
     return idx;
   }
 
-  private T[] ChunkFor(int index)
+  private ref T Ref(int index)
   {
-    var cidx = index >> CHUNK_SHIFT;
-    if (cidx == chunks.Count)
+    var (chunk, offset) = IndexToChunkOffset(index);
+    if (chunk == chunks.Count)
       chunks.Add(new T[CHUNK_SIZE]);
-    return chunks[cidx];
+    return ref chunks[chunk][offset];
+  }
+
+  private static (int, int) IndexToChunkOffset(int index)
+  {
+    return (index >> CHUNK_SHIFT, index & CHUNK_MASK);
   }
 
   public Enumerator GetEnumerator() => new(this);

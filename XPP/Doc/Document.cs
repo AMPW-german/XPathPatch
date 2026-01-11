@@ -10,6 +10,7 @@ public partial class XPDocument
   private int docVersion = 0;
 
   public int Version => docVersion;
+  public int TotalNodes => nodes.Length;
 
   public static XPDocument New() => new();
 
