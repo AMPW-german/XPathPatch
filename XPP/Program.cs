@@ -31,9 +31,9 @@ public static class Program
     // doc.Load("C:/Program Files/Kitten Space Agency/Content/Core/DefaultAssets.xml");
 
     // TestXPath(new NavAdapter(doc.DocumentElement.CreateNavigator()));
-    // TestXPDoc(doc);
+    TestXPDoc(doc);
     // TestXPDocRead(doc);
-    SpeedTest("C://Program Files (x86)/Steam/steamapps/common/Stationeers/rocketstation_Data/StreamingAssets");
+    // SpeedTest("C://Program Files (x86)/Steam/steamapps/common/Stationeers/rocketstation_Data/StreamingAssets");
   }
 
   private static void TestXPDoc(XmlDocument doc)
@@ -43,20 +43,24 @@ public static class Program
 
     xpdoc.NewVersion();
     var parent = xpdoc.LatestRoot.FirstContent.FirstContent;
-    xpdoc.AddChild(
-      parent.Index,
-      XPType.Attribute,
-      rawName: "name",
-      value: "value"
-    );
+    // xpdoc.AddChild(
+    //   parent.Index,
+    //   XPType.Attribute,
+    //   rawName: "name",
+    //   value: "value"
+    // );
+    parent.SetAttribute("name", "value");
+    xpdoc.NewVersion();
+    parent.LatestVersion.SetAttribute("name", "value2");
     Console.WriteLine(xpdoc.ToString());
+    Console.WriteLine(xpdoc.ToString(1));
     Console.WriteLine(xpdoc.ToString(0));
 
     // xpdoc.DebugDump();
 
-    const string path = "(//@* | //namespace::*)";
-    TestXPath(xpdoc.Root(0).Nav, path);
-    TestXPath(xpdoc.Root(1).Nav, path);
+    // const string path = "(//@* | //namespace::*)";
+    // TestXPath(xpdoc.Root(0).Nav, path);
+    // TestXPath(xpdoc.Root(1).Nav, path);
   }
 
   private static void TestXPDocRead(XmlDocument doc)
@@ -113,7 +117,7 @@ public static class Program
       total += xpdoc.TotalNodes;
     }
     stopwatch.Stop();
-    Console.WriteLine($"imported {docs.Count*ITER_COUNT} docs with {total} nodes in {stopwatch.Elapsed.TotalMilliseconds:0.##}ms");
+    Console.WriteLine($"imported {docs.Count * ITER_COUNT} docs with {total} nodes in {stopwatch.Elapsed.TotalMilliseconds:0.##}ms");
   }
 
   private static void TestXPath<Nav>(Nav nav, string path = null) where Nav : IXPathNav<Nav>

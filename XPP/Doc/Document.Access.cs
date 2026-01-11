@@ -20,6 +20,13 @@ public partial class XPDocument
     return new(this, nodes[index].DVersion, index);
   }
 
+  private XPNodeRef MakeRefAt(int version, int index)
+  {
+    if (index == -1)
+      return XPNodeRef.Invalid;
+    return new(this, version, Latest(index, version).Index);
+  }
+
   private static readonly Node InvalidNode = new()
   {
     Index = -1,
@@ -77,8 +84,19 @@ public partial class XPDocument
   public XPNodeRef PrevVersion(XPNodeRef of) => MakeRefExact(Lookup(of).VPrev);
   public XPNodeRef NextVersion(XPNodeRef of) => MakeRefExact(Lookup(of).VPrev);
   public XPNodeRef FirstVersion(XPNodeRef of) => MakeRefExact(Lookup(of, -1, true).Index);
-  public XPNodeRef LatestVersion(XPNodeRef of) => MakeRefExact(Lookup(of, int.MaxValue).Index);
+  public XPNodeRef LatestVersion(XPNodeRef of) => MakeRefAt(docVersion, Lookup(of, int.MaxValue).Index);
   public XPNodeRef AtVersion(XPNodeRef of, int version) => MakeRef(new(this, version, of.Index), Lookup(of, version).Index);
+
+  public void SetValue(XPNodeRef of, string value)
+  {
+    if (of.DocVersion < docVersion)
+      throw new InvalidOperationException("cannot set value of previous version");
+    ref var node = ref Latest(of.Index, of.DocVersion);
+    if (!node.Type.HasValue)
+      throw new InvalidOperationException($"cannot set value of {node.Type} node");
+    node = ref Current(node.Index);
+    node.Value = value;
+  }
 
   public string ToString(XPNodeRef of, string indent = "")
   {
@@ -113,7 +131,61 @@ public partial struct XPNodeRef
   public XPNodeRef LatestVersion => Doc?.LatestVersion(this) ?? Invalid;
   public XPNodeRef AtVersion(int version) => Doc?.AtVersion(this, version) ?? Invalid;
 
+  public XPNodeRef AddChild(
+    XPType type, string name, string value = null,
+    XPNodeRef? before = null, XPNodeRef? after = null
+  ) => Doc?.AddChild(
+      Canon.Index, type, rawName: name, value: value,
+      before: before?.Canon.Index ?? -1, after: after?.Canon.Index ?? -1
+    ) ?? Invalid;
+
+  public XPNodeRef AddChild(
+    XPType type, XPName name, string value = null,
+    XPNodeRef? before = null, XPNodeRef? after = null
+  ) => Doc?.AddChild(
+      Canon.Index, type, prefixedName: name, value: value,
+      before: before?.Canon.Index ?? -1, after: after?.Canon.Index ?? -1
+    ) ?? Invalid;
+
+  public XPNodeRef AddElement(
+    string name, XPNodeRef? before = null, XPNodeRef? after = null
+  ) => AddChild(XPType.Element, name, before: before, after: after);
+  public XPNodeRef AddElement(
+    XPName name, XPNodeRef? before = null, XPNodeRef? after = null
+  ) => AddChild(XPType.Element, name, before: before, after: after);
+
+  public XPNodeRef AddAttribute(
+    string name, string value, XPNodeRef? before = null, XPNodeRef? after = null
+  ) => AddChild(XPType.Attribute, name, value: value, before: before, after: after);
+  public XPNodeRef AddAttribute(
+    XPName name, string value, XPNodeRef? before = null, XPNodeRef? after = null
+  ) => AddChild(XPType.Attribute, name, value: value, before: before, after: after);
+
+  public void SetValue(string value) => Doc.SetValue(this, value);
+
   public bool SameAs(XPNodeRef other) => Valid && Canon.Index == other.Canon.Index;
+
+  public XPNodeRef SetAttribute(string name, string value)
+  {
+    var attr = Attribute(name);
+    if (attr.Valid)
+    {
+      attr.SetValue(value);
+      return attr;
+    }
+    return AddAttribute(name, value);
+  }
+
+  public XPNodeRef SetAttribute(XPName name, string value)
+  {
+    var attr = Attribute(name);
+    if (attr.Valid)
+    {
+      attr.SetValue(value);
+      return attr;
+    }
+    return AddAttribute(name, value);
+  }
 
   public XPNodeRef Attribute(string rawName)
   {
