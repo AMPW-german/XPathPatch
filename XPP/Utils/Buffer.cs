@@ -1,7 +1,7 @@
 
 using System;
 
-namespace XPP.Path;
+namespace XPP.Utils;
 
 public ref struct SpanBuf<T>(Span<T> buf)
 {
