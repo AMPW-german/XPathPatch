@@ -249,7 +249,7 @@ public ref partial struct Exec<Nav>
     });
   }
 
-  private bool BoolValue(TypedValue val) => val.Type switch
+  public bool BoolValue(TypedValue val) => val.Type switch
   {
     ValueType.Bool => val.Value.Bool,
     ValueType.Number => val.Value.Number != 0 && !double.IsNaN(val.Value.Number),
@@ -258,7 +258,7 @@ public ref partial struct Exec<Nav>
     _ => throw new InvalidOperationException($"{val.Type}"),
   };
 
-  private double NumberValue(TypedValue val) => val.Type switch
+  public double NumberValue(TypedValue val) => val.Type switch
   {
     ValueType.Bool => val.Value.Bool ? 1 : 0,
     ValueType.Number => val.Value.Number,
@@ -272,7 +272,7 @@ public ref partial struct Exec<Nav>
     _ => throw new InvalidOperationException($"{val.Type}"),
   };
 
-  private Range StringValue(TypedValue val) => val.Type switch
+  public Range StringValue(TypedValue val) => val.Type switch
   {
     ValueType.Bool => val.Value.Bool ? TRUE_DATA : FALSE_DATA,
     ValueType.Number => GetNumberStringValue(val.Value.Number),

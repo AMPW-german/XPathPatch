@@ -25,4 +25,18 @@ public partial class XPath
     Compiler.Compile(source, nodes, out var paths, out var vals, out var data);
     return new(source, paths, vals, data);
   }
+
+  public TypedValue Exec<Nav>(Nav nav, out Exec<Nav> exec) where Nav : IXPathNav<Nav>
+  {
+    exec = new(this);
+    return exec.Run(nav);
+  }
+
+  public static TypedValue Exec<Nav>(string source, Nav nav, out Exec<Nav> exec)
+    where Nav : IXPathNav<Nav>
+  {
+    var xpath = Parse(source);
+    exec = new(xpath);
+    return exec.Run(nav);
+  }
 }

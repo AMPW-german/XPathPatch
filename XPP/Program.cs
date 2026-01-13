@@ -283,7 +283,7 @@ public static class Program
       // foreach (var doc in rawDocs)
       {
         xpdoc.NewVersion();
-        xpdoc.Import(doc, root.LatestVersion.Index);
+        xpdoc.Import(doc, root.LatestVersion.Id.Index);
         // xpdoc.Import(
         //   XmlReader.Create(new MemoryStream(doc)),
         //   root.LatestVersion.Index);

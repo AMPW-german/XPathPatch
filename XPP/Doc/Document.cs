@@ -1,5 +1,6 @@
 
 using System;
+using XPP.Utils;
 
 namespace XPP.Doc;
 
@@ -29,7 +30,7 @@ public partial class XPDocument
     roots.Add(roots[^1]);
   }
 
-  public bool ResolveName(int index, int version, string name, out XPName resolved)
+  public bool ResolveName(XPNodeId id, string name, out XPName resolved)
   {
     XPName.Parts(name, out var prefix, out var local);
     if (prefix.Length == 0)
@@ -43,10 +44,10 @@ public partial class XPDocument
       return true;
     }
 
-    return ResolveName(index, version, new(prefix), new(local), out resolved);
+    return ResolveName(id, new(prefix), new(local), out resolved);
   }
 
-  public bool ResolveName(int index, int version, string prefix, string local, out XPName resolved)
+  public bool ResolveName(XPNodeId id, string prefix, string local, out XPName resolved)
   {
     if (prefix == "")
     {
@@ -58,13 +59,14 @@ public partial class XPDocument
       resolved = new(XMLNS_URI, XMLNS_PREFIX, local);
       return true;
     }
+    var index = id.Index;
     while (index != -1)
     {
-      ref var node = ref nodes[index];
+      ref var node = ref Latest(index, id.DocVersion);
       var nsIdx = node.FirstAttr;
       while (nsIdx != -1)
       {
-        ref var nsNode = ref Latest(nsIdx, version);
+        ref var nsNode = ref Latest(nsIdx, id.DocVersion);
         if (nsNode.Type is XPType.Namespace && prefix == nsNode.Name.Local)
         {
           resolved = new(nsNode.Value, new(prefix), new(local));
@@ -158,9 +160,9 @@ public partial class XPDocument
     {
       bool validName;
       if (prefixedName is XPName parsed)
-        validName = ResolveName(parent, docVersion, parsed.Prefix, parsed.Local, out name);
+        validName = ResolveName(new(docVersion, parent), parsed.Prefix, parsed.Local, out name);
       else
-        validName = ResolveName(parent, docVersion, rawName, out name);
+        validName = ResolveName(new(docVersion, parent), rawName, out name);
       if (!validName)
         throw new InvalidOperationException($"unknown prefix '{name.Prefix}'");
 
@@ -192,7 +194,7 @@ public partial class XPDocument
         {
           prevNode = ref Current(prev);
           prevNode.Value += value;
-          return new(this, docVersion, prevNode.Index);
+          return new(this, new(docVersion, prevNode.Index));
         }
       }
       if (next != -1)
@@ -202,7 +204,7 @@ public partial class XPDocument
         {
           nextNode = ref Current(next);
           nextNode.Value = value + nextNode.Value;
-          return new(this, docVersion, nextNode.Index);
+          return new(this, new(docVersion, nextNode.Index));
         }
       }
     }
@@ -235,7 +237,7 @@ public partial class XPDocument
       node.NextSibling = nextNode.Index;
     }
 
-    return new(this, docVersion, node.Index);
+    return new(this, new(docVersion, node.Index));
   }
 
   public void RemoveNode(int index)
@@ -294,6 +296,7 @@ public partial class XPDocument
     } while (siblings && index != -1);
   }
 
+  private ref Node Latest(XPNodeId id) => ref Latest(id.Index, id.DocVersion);
   private ref Node Latest(int index, int maxVersion = int.MaxValue)
   {
     ref var node = ref nodes[index];
@@ -433,12 +436,20 @@ public readonly struct XPName(string NsUri, string Prefix, string Local) : IEqua
   }
 }
 
-public readonly partial struct XPNodeRef(XPDocument Doc, int DocVersion, int Index)
+public readonly struct XPNodeId(int DocVersion, int Index)
 {
-  public static readonly XPNodeRef Invalid = new(null, 0, -1);
+  public static readonly XPNodeId Invalid = new(-1, -1);
 
-  public readonly XPDocument Doc = Doc;
   public readonly int DocVersion = DocVersion;
   public readonly int Index = Index;
-  public bool Valid => Index >= 0 && Doc != null;
+  public bool Valid => DocVersion >= 0 && Index >= 0;
+}
+
+public readonly partial struct XPNodeRef(XPDocument Doc, XPNodeId Id)
+{
+  public static readonly XPNodeRef Invalid = new(null, XPNodeId.Invalid);
+
+  public readonly XPDocument Doc = Doc;
+  public readonly XPNodeId Id = Id;
+  public bool Valid => Doc != null && Id.Valid;
 }

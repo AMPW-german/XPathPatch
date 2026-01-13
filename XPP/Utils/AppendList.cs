@@ -3,7 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace XPP.Doc;
+namespace XPP.Utils;
 
 public class AppendList<T> : IEnumerable<T> where T : notnull
 {
@@ -65,7 +65,6 @@ public class AppendList<T> : IEnumerable<T> where T : notnull
     private int index;
 
     public T Current => list[index];
-
     object IEnumerator.Current => Current;
 
     public void Dispose() { }
