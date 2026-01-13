@@ -4,12 +4,12 @@ using XPP.Path;
 
 namespace XPP.Doc;
 
-public struct XPNavAdapter(XPNodeRef Node) : IXPathNav<XPNavAdapter>
+public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
 {
   public readonly XPNodeRef Node = Node;
 
-  public XPNavAdapter Clone() => this;
-  public XPNavAdapter Root() => new(Node.Doc.Root(Node.Id.DocVersion));
+  public XPNavigator Clone() => this;
+  public XPNavigator Root() => new(Node.Doc.Root(Node.Id.DocVersion));
   public NodeType Type() => Node.Type switch
   {
     XPType.Invalid => NodeType.Invalid,
@@ -42,23 +42,23 @@ public struct XPNavAdapter(XPNodeRef Node) : IXPathNav<XPNavAdapter>
   }
   public bool HasName(ReadOnlySpan<char> name) => name.SequenceEqual(Node.Name.Local);
 
-  public bool Parent(out XPNavAdapter nav) => Make(Node.Parent, out nav);
-  public bool FirstChild(out XPNavAdapter nav) => Make(Node.FirstContent, out nav);
-  public bool LastChild(out XPNavAdapter nav) => Make(Node.LastContent, out nav);
-  public bool NextSibling(out XPNavAdapter nav) =>
+  public bool Parent(out XPNavigator nav) => Make(Node.Parent, out nav);
+  public bool FirstChild(out XPNavigator nav) => Make(Node.FirstContent, out nav);
+  public bool LastChild(out XPNavigator nav) => Make(Node.LastContent, out nav);
+  public bool NextSibling(out XPNavigator nav) =>
     Make(Node.Type.IsContent ? Node.NextSibling : XPNodeRef.Invalid, out nav);
-  public bool PreviousSibling(out XPNavAdapter nav) =>
+  public bool PreviousSibling(out XPNavigator nav) =>
     Make(Node.Type.IsContent ? Node.PrevSibling : XPNodeRef.Invalid, out nav);
-  public bool FirstAttribute(out XPNavAdapter nav) =>
+  public bool FirstAttribute(out XPNavigator nav) =>
     FirstOfType(Node.FirstAttr, XPType.Attribute, out nav);
-  public bool NextAttribute(out XPNavAdapter nav) =>
+  public bool NextAttribute(out XPNavigator nav) =>
     FirstOfType(Node.NextSibling, XPType.Attribute, out nav);
-  public bool FirstNamespace(out XPNavAdapter nav) =>
+  public bool FirstNamespace(out XPNavigator nav) =>
     FirstOfType(Node.FirstAttr, XPType.Namespace, out nav);
-  public bool NextNamespace(out XPNavAdapter nav) =>
+  public bool NextNamespace(out XPNavigator nav) =>
     FirstOfType(Node.NextSibling, XPType.Namespace, out nav);
 
-  private static bool FirstOfType(XPNodeRef node, XPType type, out XPNavAdapter nav)
+  private static bool FirstOfType(XPNodeRef node, XPType type, out XPNavigator nav)
   {
     if (!node.Type.SameChildTypeAs(type))
       return Make(XPNodeRef.Invalid, out nav);
@@ -67,7 +67,7 @@ public struct XPNavAdapter(XPNodeRef Node) : IXPathNav<XPNavAdapter>
     return Make(node, out nav);
   }
 
-  private static bool Make(XPNodeRef node, out XPNavAdapter nav) =>
+  private static bool Make(XPNodeRef node, out XPNavigator nav) =>
     (nav = new(node)).Node.Valid;
 
   public int StringValue(Span<char> buffer) => BuildStringValue(Node, buffer);
@@ -97,7 +97,7 @@ public struct XPNavAdapter(XPNodeRef Node) : IXPathNav<XPNavAdapter>
     return length + BuildStringValue(node.FirstContent, buffer[length..]);
   }
 
-  public int CompareTo(XPNavAdapter other)
+  public int CompareTo(XPNavigator other)
   {
     if (Node.SameAs(other.Node))
       return 0;
@@ -158,5 +158,5 @@ public struct XPNavAdapter(XPNodeRef Node) : IXPathNav<XPNavAdapter>
 
 public partial struct XPNodeRef
 {
-  public XPNavAdapter Nav => new(this);
+  public XPNavigator Nav => new(this);
 }

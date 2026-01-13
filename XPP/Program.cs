@@ -8,6 +8,7 @@ using System.Text;
 using System.Xml;
 using System.Xml.XPath;
 using XPP.Doc;
+using XPP.Patch;
 using XPP.Path;
 
 namespace XPP;
@@ -75,8 +76,8 @@ public static class Program
     // xpdoc.DebugDump();
 
     // const string path = "(//@* | //namespace::*)";
-    // TestXPath(xpdoc.Root(0).Nav, path);
-    // TestXPath(xpdoc.Root(1).Nav, path);
+    // TestXPath(xpdoc.Root(0), path);
+    // TestXPath(xpdoc.Root(1), path);
   }
 
   private static void TestXPDocRead(XmlDocument doc)
@@ -295,19 +296,20 @@ public static class Program
     // Console.WriteLine($"imported {rawDocs.Count * ITER_COUNT} docs with {total} nodes in {stopwatch.Elapsed.TotalMilliseconds:0.##}ms");
   }
 
-  private static void TestXPath<Nav>(Nav nav, string path = null) where Nav : IXPathNav<Nav>
+  private static void TestXPath(XPNodeRef node, string path = null)
   {
     var xpath = XPath.Parse(path ?? Path);
     DebugPrint(xpath);
-    var exec = new Exec<Nav>(xpath);
-
-    var val = exec.Run(nav);
 
     var i = 0;
-    while (exec.NextNode(val.Value.NodeSet, out nav))
+    foreach (var val in xpath.Exec(node))
     {
-      Console.WriteLine($"{i++} {nav.Type()} attr:{nav.IsAttribute()} ns:{nav.IsNs()}");
-      Console.WriteLine($"  {nav.OuterXml()}");
+      var strVal = val.Type switch
+      {
+        XPValueType.NodeSet => val.Node.Nav.OuterXml(),
+        _ => val.StringValue,
+      };
+      Console.WriteLine($"{i++} {val.Type} {strVal}");
     }
   }
 
@@ -327,131 +329,4 @@ public static class Program
       Console.WriteLine($"P{i:00} {path.Type} {path.Paths} {path.Name}");
     }
   }
-}
-
-public struct NavAdapter(XPathNavigator node) : IXPathNav<NavAdapter>
-{
-  private readonly XPathNavigator node = node;
-
-  public XmlNode Node => (XmlNode)node.UnderlyingObject;
-
-  public NavAdapter Clone() => new(node.Clone());
-
-  public NavAdapter Root()
-  {
-    var nav = Clone();
-    nav.node.MoveToRoot();
-    return nav;
-  }
-
-  public NodeType Type() => node.NodeType switch
-  {
-    XPathNodeType.Text or XPathNodeType.SignificantWhitespace or XPathNodeType.Whitespace => NodeType.Text,
-    XPathNodeType.ProcessingInstruction => NodeType.ProcessingInstruction,
-    XPathNodeType.Comment => NodeType.Comment,
-    _ => NodeType.Node,
-  };
-
-  public bool IsAttribute() => node.NodeType == XPathNodeType.Attribute;
-
-  public bool IsNs() => node.NodeType == XPathNodeType.Namespace;
-
-  public bool HasNs(ReadOnlySpan<char> ns)
-  {
-    return ns.Equals(node.BaseURI, StringComparison.InvariantCulture);
-  }
-
-  public bool HasName(ReadOnlySpan<char> name)
-  {
-    return name.Equals(node.LocalName, StringComparison.InvariantCulture);
-  }
-
-  public int CompareTo(NavAdapter other) => node.ComparePosition(other.node) switch
-  {
-    XmlNodeOrder.Before => -1,
-    XmlNodeOrder.Same => 0,
-    XmlNodeOrder.After => 1,
-    _ => throw new InvalidOperationException(),
-  };
-
-  public bool Parent(out NavAdapter nav)
-  {
-    nav = Clone();
-    return nav.node.MoveToParent();
-  }
-
-  public bool FirstChild(out NavAdapter nav)
-  {
-    nav = Clone();
-    return nav.node.MoveToFirstChild();
-  }
-
-  public bool LastChild(out NavAdapter nav)
-  {
-    nav = Clone();
-    if (!nav.node.MoveToFirstChild())
-      return false;
-    while (nav.node.MoveToNext()) ;
-    return true;
-  }
-
-  public bool NextSibling(out NavAdapter nav)
-  {
-    nav = Clone();
-    return nav.node.MoveToNext();
-  }
-
-  public bool PreviousSibling(out NavAdapter nav)
-  {
-    nav = Clone();
-    return nav.node.MoveToPrevious();
-  }
-
-  public bool FirstAttribute(out NavAdapter nav)
-  {
-    nav = Clone();
-    return nav.node.MoveToFirstAttribute();
-  }
-
-  public bool NextAttribute(out NavAdapter nav)
-  {
-    nav = Clone();
-    return nav.node.MoveToNextAttribute();
-  }
-
-  public bool FirstNamespace(out NavAdapter nav)
-  {
-    nav = Clone();
-    return nav.node.MoveToFirstNamespace();
-  }
-
-  public bool NextNamespace(out NavAdapter nav)
-  {
-    nav = Clone();
-    return nav.node.MoveToNextNamespace();
-  }
-
-  public int StringValue(Span<char> buffer) =>
-    BuildStringValue(node.UnderlyingObject as XmlNode, buffer);
-
-  // adapted from DocumentXPathNavigator.Value and XmlNode.InnerText
-  private static int BuildStringValue(XmlNode node, Span<char> buffer)
-  {
-    if (node is XmlAttribute or XmlCharacterData)
-    {
-      var val = node.Value;
-      val.AsSpan().CopyTo(buffer);
-      return val.Length;
-    }
-    var child = node.FirstChild;
-    var len = 0;
-    while (child != null)
-    {
-      len += BuildStringValue(child, buffer[len..]);
-      child = child.NextSibling;
-    }
-    return len;
-  }
-
-  public string OuterXml() => Node.OuterXml;
 }

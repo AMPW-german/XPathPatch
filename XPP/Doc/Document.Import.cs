@@ -117,7 +117,8 @@ public partial class XPDocument
   private static XPName PrefixedName(XmlReader reader) =>
     new("", reader.Prefix, reader.LocalName);
 
-  public XPNodeRef Import(XPNodeRef node, int parent = 0)
+  public XPNodeRef Import(
+    XPNodeRef node, int parent = 0, int before = -1, int after = -1)
   {
     if (!node.Valid)
       throw new InvalidOperationException($"invalid node");
@@ -136,15 +137,20 @@ public partial class XPDocument
         pnode = ref Latest(pnode.Parent);
       }
     }
-    return ImportInternal(node, parent, false);
+    return ImportInternal(node, parent, false, before, after);
   }
 
-  private XPNodeRef ImportInternal(XPNodeRef node, int parent, bool siblings)
+  private XPNodeRef ImportInternal(
+    XPNodeRef node, int parent, bool siblings, int before = -1, int after = -1)
   {
     var inode = XPNodeId.Invalid;
     while (node.Valid)
     {
-      inode = AddChild(parent, node.Type, prefixedName: node.Name, value: node.Value).Id;
+      inode = AddChild(
+        parent, node.Type,
+        prefixedName: node.Name, value: node.Value,
+        before: before, after: after
+      ).Id;
       ImportInternal(node.FirstAttr, inode.Index, true);
       ImportInternal(node.FirstContent, inode.Index, true);
       if (!siblings)
@@ -171,10 +177,16 @@ public partial struct XPNodeRef
     return Doc.Import(reader, Canon.Id.Index, interior);
   }
 
-  public XPNodeRef Import(XPNodeRef node)
+  public XPNodeRef Import(
+    XPNodeRef node, XPNodeRef? before = null, XPNodeRef? after = null)
   {
     if (Id.DocVersion != Doc.Version)
       throw new InvalidOperationException($"Cannot import to previous version");
-    return Doc.Import(node, Canon.Id.Index);
+    if (before is XPNodeRef beforeNode && beforeNode.Id.DocVersion != Doc.Version)
+      throw new InvalidOperationException($"Cannot import before previous version");
+    if (after is XPNodeRef afterNode && afterNode.Id.DocVersion != Doc.Version)
+      throw new InvalidOperationException($"Cannot import after previous version");
+    return Doc.Import(
+      node, Canon.Id.Index, before?.Canon.Id.Index ?? -1, after?.Canon.Id.Index ?? -1);
   }
 }

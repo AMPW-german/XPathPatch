@@ -117,5 +117,5 @@ public class IfNonePatch : PatchOp
 public class WithPatch : PatchOp
 {
   public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
-    parent.AddChild(ActionType.OpIfNone, target: node.Id, targetPath: Path);
+    parent.AddChild(ActionType.OpWith, target: node.Id, targetPath: Path);
 }

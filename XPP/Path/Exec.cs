@@ -1,19 +1,20 @@
 
 using System;
+using XPP.Doc;
 
 namespace XPP.Path;
 
-public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
+public ref partial struct Exec(XPath path, XPNavigator ctx)
 {
-  public const int MAX_SORT_NODESET = 0x10000;
+  private const int MAX_SORT_NODESET = 0x10000;
   public const int MAX_DATA_SIZE = 0x10000;
   private struct PathState
   {
-    public Nav Nav;
+    public XPNavigator XPNavigator;
     public int Index;
     public Range Nodes;
 
-    public Nav Base;
+    public XPNavigator Base;
 
     public bool Up;
     public int Depth;
@@ -22,46 +23,37 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
     public bool SecondEnd;
   }
 
-  private class ResultBuf() : ThreadBuf<ResultBuf, Nav>(MAX_SORT_NODESET);
-  private class DedupeBuf() : ThreadBuf<DedupeBuf, Nav>(MAX_SORT_NODESET);
+  private class ResultBuf() : ThreadBuf<ResultBuf, XPNavigator>(MAX_SORT_NODESET);
+  private class DedupeBuf() : ThreadBuf<DedupeBuf, XPNavigator>(MAX_SORT_NODESET);
   private class DataBuf() : ThreadBuf<DataBuf, char>(MAX_DATA_SIZE);
-  private class StringBuf() : ThreadBuf<StringBuf, Range>(MAX_SORT_NODESET);
-  private class NumberBuf() : ThreadBuf<NumberBuf, double>(MAX_SORT_NODESET);
+  private class StringBuf() : ThreadBuf<StringBuf, string>(MAX_SORT_NODESET);
 
-  private const string DEFAULT_DATA = "truefalseNaN0-Infinity";
-  private static readonly Range TRUE_DATA = ^0..^4;
-  private static readonly Range FALSE_DATA = ^4..^9;
-  private static readonly Range NAN_DATA = ^9..^12;
-  private static readonly Range ZERO_DATA = ^12..^13;
-  private static readonly Range PINF_DATA = ^14..^22;
-  private static readonly Range NINF_DATA = ^13..^22;
+  private const string TRUE = "true";
+  private const string FALSE = "false";
+  private const string NAN = "NaN";
+  private const string ZERO = "0";
+  private const string PINF = "Infinity";
+  private const string NINF = "-Infinity";
 
-  public readonly XPath Path = Path;
+  private readonly XPath path = path;
+  private readonly XPNavigator rootContext = ctx;
 
-  private readonly PathState[] states = new PathState[Path.Paths.Length];
-  private SpanBuf<Nav> resultBuf = ResultBuf.Buf;
-  private readonly Span<Nav> dedupeBuf = DedupeBuf.Span;
-  private SpanBuf<char> data = DataBuf.Buf;
-  private SpanBuf<Range> stringBuf = StringBuf.Buf;
-  private SpanBuf<double> numberBuf = NumberBuf.Buf;
+  private readonly PathState[] states = new PathState[path.Paths.Length];
+  private SpanBuf<XPNavigator> resultBuf = ResultBuf.Buf;
+  private readonly Span<XPNavigator> dedupeBuf = DedupeBuf.Span;
+  private readonly Span<char> dataBuf = DataBuf.Span;
+  private SpanBuf<string> stringBuf = StringBuf.Buf;
 
-  public ReadOnlySpan<char> String(Range range)
+  private bool started = false;
+  private Value result;
+  private XPNodeRef resultNode;
+
+  private ReadOnlySpan<char> CompiledString(Range range) =>
+    path.Data.AsSpan(range);
+
+  public bool NextNode(int idx, out XPNavigator nav)
   {
-    if (range.Start.IsFromEnd)
-      return DEFAULT_DATA.AsSpan()[range.Start.Value..range.End.Value];
-    return data[range];
-  }
-
-  public TypedValue Run(Nav ctx)
-  {
-    if (data.Length == 0 && Path.Data.Length > 0)
-      data.AddRange(Path.Data);
-    return GetValue(0, ctx);
-  }
-
-  public bool NextNode(int idx, out Nav nav)
-  {
-    ref readonly var op = ref Path.Paths[idx];
+    ref readonly var op = ref path.Paths[idx];
     ref var state = ref states[idx];
     switch (op.Type)
     {
@@ -71,7 +63,7 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
           nav = default;
           return false;
         }
-        nav = state.Nav.Clone();
+        nav = state.XPNavigator.Clone();
         return true;
       case PathOpType.Root:
         if (state.Index++ > 0)
@@ -79,47 +71,47 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
           nav = default;
           return false;
         }
-        nav = state.Nav.Root().Clone();
+        nav = state.XPNavigator.Root().Clone();
         return true;
       case PathOpType.Union:
         return NextUnion(idx, out nav);
       case PathOpType.Axis:
         return NextAxis(idx, out nav);
       case PathOpType.NodeType:
-        while (NextNode(idx + 1, out state.Nav))
+        while (NextNode(idx + 1, out state.XPNavigator))
         {
-          if (op.NodeType == NodeType.Node || state.Nav.Type() == op.NodeType)
+          if (op.NodeType == NodeType.Node || state.XPNavigator.Type() == op.NodeType)
           {
             state.Index++;
-            nav = state.Nav.Clone();
+            nav = state.XPNavigator.Clone();
             return true;
           }
         }
         nav = default;
         return false;
       case PathOpType.NameTest:
-        while (NextNode(idx + 1, out state.Nav))
+        while (NextNode(idx + 1, out state.XPNavigator))
         {
-          if (NameTest(in op, ref state.Nav))
+          if (NameTest(in op, ref state.XPNavigator))
           {
             state.Index++;
-            nav = state.Nav.Clone();
+            nav = state.XPNavigator.Clone();
             return true;
           }
         }
         nav = default;
         return false;
       case PathOpType.Filter:
-        while (NextNode(idx + 1, out state.Nav))
+        while (NextNode(idx + 1, out state.XPNavigator))
         {
-          var val = GetValue(op.Filter, state.Nav);
+          var val = GetValue(op.Filter, state.XPNavigator);
           if (val.Type switch
           {
-            ValueType.Number => throw new NotImplementedException(),
+            XPValueType.Number => throw new NotImplementedException(),
             _ => BoolValue(val),
           })
           {
-            nav = state.Nav.Clone();
+            nav = state.XPNavigator.Clone();
             return true;
           }
         }
@@ -146,10 +138,10 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
     }
   }
 
-  private bool NameTest(ref readonly PathOp op, ref Nav nav)
+  private bool NameTest(ref readonly PathOp op, ref XPNavigator nav)
   {
-    var ns = Path.Data.AsSpan(op.Ns);
-    var name = Path.Data.AsSpan(op.Name);
+    var ns = path.Data.AsSpan(op.Ns);
+    var name = path.Data.AsSpan(op.Name);
     return (ns.Length, name.Length) switch
     {
       (_, > 0) => nav.HasNs(ns) && nav.HasName(name),
@@ -170,7 +162,7 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
 
   private void NormalizeDedupe(int idx, ref PathState state)
   {
-    var buf = new SpanBuf<Nav>(dedupeBuf);
+    var buf = new SpanBuf<XPNavigator>(dedupeBuf);
 
     while (NextNode(idx + 1, out var nav))
     {
@@ -182,7 +174,7 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
     state.Nodes = resultBuf.AddRange(buf.Span);
   }
 
-  private static void Compact(ref SpanBuf<Nav> buf)
+  private static void Compact(ref SpanBuf<XPNavigator> buf)
   {
     if (buf.Length < 2)
       return;
@@ -197,17 +189,17 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
     buf.Length = count;
   }
 
-  private bool NextUnion(int idx, out Nav nav)
+  private bool NextUnion(int idx, out XPNavigator nav)
   {
     ref var state = ref states[idx];
-    ref readonly var op = ref Path.Paths[idx];
+    ref readonly var op = ref path.Paths[idx];
     var (p1, p2) = op.Paths;
     if (state.Index++ == 0)
     {
-      ResetPath(p1, state.Nav);
-      ResetPath(p2, state.Nav);
+      ResetPath(p1, state.XPNavigator);
+      ResetPath(p2, state.XPNavigator);
       state.FirstEnd = !NextNode(p1, out state.Base);
-      state.SecondEnd = !NextNode(p2, out state.Nav);
+      state.SecondEnd = !NextNode(p2, out state.XPNavigator);
     }
 
     var next1 = false;
@@ -218,7 +210,7 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
       nav = default;
     else if (state.FirstEnd)
     {
-      nav = state.Nav;
+      nav = state.XPNavigator;
       next2 = true;
       res = true;
     }
@@ -230,7 +222,7 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
     }
     else
     {
-      var cmp = state.Base.CompareTo(state.Nav);
+      var cmp = state.Base.CompareTo(state.XPNavigator);
       if (cmp < 0)
       {
         nav = state.Base;
@@ -238,7 +230,7 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
       }
       else if (cmp > 0)
       {
-        nav = state.Nav;
+        nav = state.XPNavigator;
         next2 = true;
       }
       else
@@ -258,14 +250,14 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
     if (next2)
     {
       state.SecondEnd = !NextNode(p2, out var second);
-      state.Nav = second;
+      state.XPNavigator = second;
     }
     return res;
   }
 
-  private void ResetPath(int idx, Nav ctx)
+  private void ResetPath(int idx, XPNavigator ctx)
   {
-    while (!Path.Paths[idx].Type.IsRoot)
+    while (!path.Paths[idx].Type.IsRoot)
     {
       ref var state = ref states[idx++];
       state.Index = -1;
@@ -274,32 +266,6 @@ public ref partial struct Exec<Nav>(XPath Path) where Nav : IXPathNav<Nav>
         resultBuf.Length = start;
       state.Nodes = 0..0;
     }
-    states[idx] = new() { Nav = ctx.Clone(), Index = 0 };
+    states[idx] = new() { XPNavigator = ctx.Clone(), Index = 0 };
   }
-}
-
-public interface IXPathNav<Nav> : IComparable<Nav> where Nav : IXPathNav<Nav>
-{
-  public Nav Clone();
-  public Nav Root();
-  public NodeType Type();
-  public bool IsAttribute();
-  public bool IsNs();
-
-  public bool HasNs(ReadOnlySpan<char> ns);
-  public bool HasName(ReadOnlySpan<char> name);
-
-  public bool Parent(out Nav nav);
-  public bool FirstChild(out Nav nav);
-  public bool LastChild(out Nav nav);
-  public bool NextSibling(out Nav nav);
-  public bool PreviousSibling(out Nav nav);
-  public bool FirstAttribute(out Nav nav);
-  public bool NextAttribute(out Nav nav);
-  public bool FirstNamespace(out Nav nav);
-  public bool NextNamespace(out Nav nav);
-
-  public int StringValue(Span<char> buffer);
-
-  public string OuterXml();
 }

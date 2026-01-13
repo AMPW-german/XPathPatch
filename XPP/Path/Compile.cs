@@ -38,7 +38,7 @@ public readonly struct ValOp(ValOpType type, int left = -1, int right = -1)
   public readonly ValOpType Type = type;
   public readonly int Left = left;
   public readonly int Right = right;
-  public readonly Value Value;
+  public readonly CompileValue Value;
 
   public Range Args => Left..Right;
   public Range Name => Value.String;
@@ -51,11 +51,11 @@ public readonly struct ValOp(ValOpType type, int left = -1, int right = -1)
   public ValOp(ValOpType type, Range name, Range args) : this(type, args.Start.Value, args.End.Value) =>
     Value = new() { String = name };
   // Number, String, Variable (name in String)
-  public ValOp(ValOpType type, Value value) : this(type) => Value = value;
+  public ValOp(ValOpType type, CompileValue value) : this(type) => Value = value;
 }
 
 [StructLayout(LayoutKind.Explicit)]
-public struct Value
+public struct CompileValue
 {
   [FieldOffset(0)]
   public bool Bool;
@@ -244,7 +244,7 @@ public ref struct Compiler
             TokenType.VarRef => new(ValOpType.Variable, compiler.AddDataVal(node.Token, 1, 0)),
             TokenType.String => new(ValOpType.String, compiler.AddDataVal(node.Token, 1, 1)),
             TokenType.Number => new(ValOpType.Number,
-              new Value { Number = double.Parse(compiler.TokStr(node.Token)) }),
+              new CompileValue { Number = double.Parse(compiler.TokStr(node.Token)) }),
             _ => throw new InvalidOperationException($"{node.Token.Type}"),
           });
           break;
@@ -511,7 +511,7 @@ public ref struct Compiler
     return data.AddRange(str[(idx + 1)..]);
   }
 
-  private Value AddDataVal(Token tok, int strim, int etrim)
+  private CompileValue AddDataVal(Token tok, int strim, int etrim)
   {
     var str = TokStr(tok);
     return new() { String = data.AddRange(str[strim..^etrim]) };

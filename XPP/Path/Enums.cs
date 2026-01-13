@@ -177,7 +177,7 @@ public enum LibraryFunc
   Round, // number round(number)
 }
 
-public enum ValueType
+public enum XPValueType
 {
   Bool, Number, String, NodeSet,
 }

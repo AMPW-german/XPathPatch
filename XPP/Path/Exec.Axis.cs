@@ -1,14 +1,15 @@
 
 using System;
+using XPP.Doc;
 
 namespace XPP.Path;
 
-public ref partial struct Exec<Nav>
+public ref partial struct Exec
 {
-  private bool NextAxis(int idx, out Nav nav)
+  private bool NextAxis(int idx, out XPNavigator nav)
   {
     ref var state = ref states[idx];
-    var axis = Path.Paths[idx].Axis;
+    var axis = path.Paths[idx].Axis;
     while (true)
     {
       if (!NextInit(idx, ref state))
@@ -32,7 +33,7 @@ public ref partial struct Exec<Nav>
         AxisType.Preceding => NextAxisPreceding(ref state, out nav),
         AxisType.PrecedingSibling => NextAxisPrecedingSibling(ref state, out nav),
         AxisType.Self => NextAxisSelf(ref state, out nav),
-        _ => throw new InvalidOperationException($"{Path.Paths[idx].Axis}"),
+        _ => throw new InvalidOperationException($"{path.Paths[idx].Axis}"),
       })
       {
         state.Index++;
@@ -47,176 +48,176 @@ public ref partial struct Exec<Nav>
   {
     if (state.Index != -1)
       return true;
-    return NextNode(idx + 1, out state.Nav);
+    return NextNode(idx + 1, out state.XPNavigator);
   }
 
-  private bool NextAxisAncestor(ref PathState state, out Nav nav)
+  private bool NextAxisAncestor(ref PathState state, out XPNavigator nav)
   {
-    var res = state.Nav.Parent(out nav);
-    state.Nav = nav;
+    var res = state.XPNavigator.Parent(out nav);
+    state.XPNavigator = nav;
     return res;
   }
 
-  private bool NextAxisAncestorOrSelf(ref PathState state, out Nav nav)
+  private bool NextAxisAncestorOrSelf(ref PathState state, out XPNavigator nav)
   {
     if (state.Index == -1)
     {
-      nav = state.Nav;
+      nav = state.XPNavigator;
       return true;
     }
-    var res = state.Nav.Parent(out nav);
-    state.Nav = nav;
+    var res = state.XPNavigator.Parent(out nav);
+    state.XPNavigator = nav;
     return res;
   }
 
-  private bool NextAxisAttribute(ref PathState state, out Nav nav)
+  private bool NextAxisAttribute(ref PathState state, out XPNavigator nav)
   {
     if (state.Index == -1)
     {
-      var res = state.Nav.FirstAttribute(out nav);
-      state.Nav = nav;
+      var res = state.XPNavigator.FirstAttribute(out nav);
+      state.XPNavigator = nav;
       return res;
     }
     else
     {
-      var res = state.Nav.NextAttribute(out nav);
-      state.Nav = nav;
+      var res = state.XPNavigator.NextAttribute(out nav);
+      state.XPNavigator = nav;
       return res;
     }
   }
 
-  private bool NextAxisChild(ref PathState state, out Nav nav)
+  private bool NextAxisChild(ref PathState state, out XPNavigator nav)
   {
     if (state.Index == -1)
     {
-      var res = state.Nav.FirstChild(out nav);
-      state.Nav = nav;
+      var res = state.XPNavigator.FirstChild(out nav);
+      state.XPNavigator = nav;
       return res;
     }
     else
     {
-      var res = state.Nav.NextSibling(out nav);
-      state.Nav = nav;
+      var res = state.XPNavigator.NextSibling(out nav);
+      state.XPNavigator = nav;
       return res;
     }
   }
 
-  private bool NextAxisDescendant(ref PathState state, out Nav nav)
+  private bool NextAxisDescendant(ref PathState state, out XPNavigator nav)
   {
     if (state.Index == -1)
-      state.Base = state.Nav;
-    if (state.Nav.FirstChild(out nav))
+      state.Base = state.XPNavigator;
+    if (state.XPNavigator.FirstChild(out nav))
     {
-      state.Nav = nav;
+      state.XPNavigator = nav;
       return true;
     }
     while (nav.CompareTo(state.Base) != 0)
     {
-      if (state.Nav.NextSibling(out nav))
+      if (state.XPNavigator.NextSibling(out nav))
       {
-        state.Nav = nav;
+        state.XPNavigator = nav;
         return true;
       }
-      if (!state.Nav.Parent(out nav))
+      if (!state.XPNavigator.Parent(out nav))
         throw new InvalidOperationException();
-      state.Nav = nav;
+      state.XPNavigator = nav;
     }
     return false;
   }
 
-  private bool NextAxisDescendantOrSelf(ref PathState state, out Nav nav)
+  private bool NextAxisDescendantOrSelf(ref PathState state, out XPNavigator nav)
   {
     if (state.Index == -1)
     {
-      state.Base = state.Nav;
-      nav = state.Nav;
+      state.Base = state.XPNavigator;
+      nav = state.XPNavigator;
       return true;
     }
     return NextAxisDescendant(ref state, out nav);
   }
 
-  private bool NextAxisFollowing(ref PathState state, out Nav nav)
+  private bool NextAxisFollowing(ref PathState state, out XPNavigator nav)
   {
-    if (state.Index == -1 && (state.Nav.IsAttribute() || state.Nav.IsNs()))
+    if (state.Index == -1 && (state.XPNavigator.IsAttribute() || state.XPNavigator.IsNs()))
     {
-      if (!state.Nav.Parent(out nav))
+      if (!state.XPNavigator.Parent(out nav))
         throw new InvalidOperationException();
-      state.Nav = nav;
+      state.XPNavigator = nav;
     }
-    if (state.Nav.FirstChild(out nav))
+    if (state.XPNavigator.FirstChild(out nav))
     {
-      state.Nav = nav;
+      state.XPNavigator = nav;
       return true;
     }
     while (true)
     {
-      if (state.Nav.NextSibling(out nav))
+      if (state.XPNavigator.NextSibling(out nav))
       {
-        state.Nav = nav;
+        state.XPNavigator = nav;
         return true;
       }
-      if (!state.Nav.Parent(out nav))
+      if (!state.XPNavigator.Parent(out nav))
         return false;
-      state.Nav = nav;
+      state.XPNavigator = nav;
     }
   }
 
-  private bool NextAxisFollowingSibling(ref PathState state, out Nav nav)
+  private bool NextAxisFollowingSibling(ref PathState state, out XPNavigator nav)
   {
-    var res = state.Nav.NextSibling(out nav);
-    state.Nav = nav;
+    var res = state.XPNavigator.NextSibling(out nav);
+    state.XPNavigator = nav;
     return res;
   }
 
-  private bool NextAxisNamespace(ref PathState state, out Nav nav)
+  private bool NextAxisNamespace(ref PathState state, out XPNavigator nav)
   {
     if (state.Index == -1)
     {
-      var res = state.Nav.FirstNamespace(out nav);
-      state.Nav = nav;
+      var res = state.XPNavigator.FirstNamespace(out nav);
+      state.XPNavigator = nav;
       return res;
     }
     else
     {
-      var res = state.Nav.NextNamespace(out nav);
-      state.Nav = nav;
+      var res = state.XPNavigator.NextNamespace(out nav);
+      state.XPNavigator = nav;
       return res;
     }
   }
 
-  private bool NextAxisParent(ref PathState state, out Nav nav)
+  private bool NextAxisParent(ref PathState state, out XPNavigator nav)
   {
     if (state.Index == -1)
-      return state.Nav.Parent(out nav);
+      return state.XPNavigator.Parent(out nav);
     nav = default;
     return false;
   }
 
-  private bool NextAxisPreceding(ref PathState state, out Nav nav)
+  private bool NextAxisPreceding(ref PathState state, out XPNavigator nav)
   {
     if (state.Index == -1)
     {
-      state.Base = state.Nav.Clone();
+      state.Base = state.XPNavigator.Clone();
       state.Up = true;
       state.Depth = 0;
     }
-    if (!state.Up && state.Nav.LastChild(out nav))
+    if (!state.Up && state.XPNavigator.LastChild(out nav))
     {
-      state.Nav = nav;
+      state.XPNavigator = nav;
       state.Depth++;
       return true;
     }
     state.Up = false;
     while (true)
     {
-      if (state.Nav.PreviousSibling(out nav))
+      if (state.XPNavigator.PreviousSibling(out nav))
       {
-        state.Nav = nav;
+        state.XPNavigator = nav;
         return true;
       }
-      if (!state.Nav.Parent(out nav))
+      if (!state.XPNavigator.Parent(out nav))
         return false;
-      state.Nav = nav;
+      state.XPNavigator = nav;
       state.Up = true;
       var skip = false;
       if (state.Depth == 0)
@@ -233,18 +234,18 @@ public ref partial struct Exec<Nav>
     }
   }
 
-  private bool NextAxisPrecedingSibling(ref PathState state, out Nav nav)
+  private bool NextAxisPrecedingSibling(ref PathState state, out XPNavigator nav)
   {
-    var res = state.Nav.PreviousSibling(out nav);
-    state.Nav = nav;
+    var res = state.XPNavigator.PreviousSibling(out nav);
+    state.XPNavigator = nav;
     return res;
   }
 
-  private bool NextAxisSelf(ref PathState state, out Nav nav)
+  private bool NextAxisSelf(ref PathState state, out XPNavigator nav)
   {
     if (state.Index == -1)
     {
-      nav = state.Nav.Clone();
+      nav = state.XPNavigator.Clone();
       return true;
     }
     nav = default;

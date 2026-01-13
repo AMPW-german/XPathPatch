@@ -1,41 +1,43 @@
 
 using System;
-using System.Collections.Generic;
 using System.Globalization;
+using XPP.Doc;
 
 namespace XPP.Path;
 
-public struct TypedValue
+public ref partial struct Exec
 {
-  public ValueType Type;
-  public Value Value;
-
-  public static TypedValue MakeBool(bool val) =>
-    new() { Type = ValueType.Bool, Value = new() { Bool = val } };
-  public static TypedValue MakeNumber(double val) =>
-    new() { Type = ValueType.Number, Value = new() { Number = val } };
-  public static TypedValue MakeString(Range val) =>
-    new() { Type = ValueType.String, Value = new() { String = val } };
-  public static TypedValue MakeNodeSet(int val) =>
-    new() { Type = ValueType.NodeSet, Value = new() { NodeSet = val } };
-}
-
-public ref partial struct Exec<Nav>
-{
-  private TypedValue GetValue(int idx, Nav ctx)
+  private ref struct Value(XPValueType type)
   {
-    ref readonly var op = ref Path.Vals[idx];
+    public XPValueType Type = type;
+    public bool Bool;
+    public double Number;
+    public string String;
+    public int NodeSet;
+
+    public Value(bool val) : this(XPValueType.Bool) => Bool = val;
+    public Value(double val) : this(XPValueType.Number) => Number = val;
+    public Value(string val) : this(XPValueType.String) => String = val;
+    public Value(ReadOnlySpan<char> val) : this(XPValueType.String) => String = new(val);
+
+    public static Value MakeNodeSet(int index) =>
+      new(XPValueType.NodeSet) { NodeSet = index };
+  }
+
+  private Value GetValue(int idx, XPNavigator ctx)
+  {
+    ref readonly var op = ref path.Vals[idx];
     switch (op.Type)
     {
-      case ValOpType.Number: return new() { Type = ValueType.Number, Value = op.Value };
-      case ValOpType.String: return new() { Type = ValueType.String, Value = op.Value };
+      case ValOpType.Number: return new(op.Value.Number);
+      case ValOpType.String: return new(CompiledString(op.Value.String));
       case ValOpType.Variable:
         throw new NotImplementedException();
       case ValOpType.Path:
         ResetPath(op.Left, ctx);
-        return TypedValue.MakeNodeSet(op.Left);
+        return Value.MakeNodeSet(op.Left);
       case ValOpType.Negate:
-        return TypedValue.MakeNumber(-NumberValue(GetValue(op.Left, ctx)));
+        return new(-NumberValue(GetValue(op.Left, ctx)));
       case ValOpType.And or ValOpType.Or: return BoolOp(idx, ctx);
       case ValOpType.Eq or ValOpType.Neq or ValOpType.Lt or ValOpType.Lte or ValOpType.Gt or ValOpType.Gte:
         return CompareOp(idx, ctx);
@@ -50,11 +52,11 @@ public ref partial struct Exec<Nav>
     }
   }
 
-  private TypedValue BoolOp(int idx, Nav ctx)
+  private Value BoolOp(int idx, XPNavigator ctx)
   {
-    ref readonly var op = ref Path.Vals[idx];
+    ref readonly var op = ref path.Vals[idx];
     var left = BoolValue(GetValue(op.Left, ctx));
-    return TypedValue.MakeBool(op.Type switch
+    return new(op.Type switch
     {
       ValOpType.And when !left => false,
       ValOpType.Or when left => true,
@@ -63,17 +65,17 @@ public ref partial struct Exec<Nav>
     });
   }
 
-  private TypedValue CompareOp(int idx, Nav ctx)
+  private Value CompareOp(int idx, XPNavigator ctx)
   {
-    ref readonly var op = ref Path.Vals[idx];
+    ref readonly var op = ref path.Vals[idx];
     var left = GetValue(op.Left, ctx);
     var right = GetValue(op.Right, ctx);
 
     bool res;
 
-    if (left.Type is ValueType.NodeSet && right.Type is ValueType.NodeSet)
+    if (left.Type is XPValueType.NodeSet && right.Type is XPValueType.NodeSet)
     {
-      var (lidx, ridx) = (left.Value.NodeSet, right.Value.NodeSet);
+      var (lidx, ridx) = (left.NodeSet, right.NodeSet);
       if (op.Type is ValOpType.Eq or ValOpType.Neq)
         res = NodeSetsEqual(lidx, ridx, op.Type is ValOpType.Eq);
       else
@@ -82,20 +84,24 @@ public ref partial struct Exec<Nav>
         res = NodeSetsCompare(lidx, ridx, minCmp, maxCmp);
       }
     }
-    else if (left.Type is ValueType.NodeSet || right.Type is ValueType.NodeSet)
+    else if (left.Type is XPValueType.NodeSet || right.Type is XPValueType.NodeSet)
     {
-      var swap = right.Type is ValueType.NodeSet;
+      var swap = right.Type is XPValueType.NodeSet;
       if (swap)
-        (left, right) = (right, left);
+      {
+        var temp = left;
+        left = right;
+        right = temp;
+      }
 
       if (op.Type is ValOpType.Eq or ValOpType.Neq)
-        res = NodeSetValEqual(left.Value.NodeSet, right, op.Type is ValOpType.Eq);
+        res = NodeSetValEqual(left.NodeSet, right, op.Type is ValOpType.Eq);
       else
       {
         var (minCmp, maxCmp) = ValOpCompareRange(op.Type);
         if (swap)
           (minCmp, maxCmp) = (-maxCmp, -minCmp);
-        res = NodeSetValCompare(left.Value.NodeSet, right, minCmp, maxCmp);
+        res = NodeSetValCompare(left.NodeSet, right, minCmp, maxCmp);
       }
     }
     else if (op.Type is ValOpType.Eq or ValOpType.Neq)
@@ -109,7 +115,7 @@ public ref partial struct Exec<Nav>
       res = cmp >= minCmp && cmp <= maxCmp;
     }
 
-    return TypedValue.MakeBool(res);
+    return new(res);
   }
 
   private static (int, int) ValOpCompareRange(ValOpType type) => type switch
@@ -121,14 +127,14 @@ public ref partial struct Exec<Nav>
     _ => throw new InvalidOperationException($"{type}"),
   };
 
-  private unsafe bool NodeSetsEqual(int lidx, int ridx, bool expected)
+  private bool NodeSetsEqual(int lidx, int ridx, bool expected)
   {
     var lstart = stringBuf.Length;
     while (NextNode(lidx, out var nav))
-      stringBuf.Add(AddNodeStringValue(nav));
+      stringBuf.Add(new(NodeStringValue(nav)));
     var rstart = stringBuf.Length;
     while (NextNode(ridx, out var nav))
-      stringBuf.Add(AddNodeStringValue(nav));
+      stringBuf.Add(new(NodeStringValue(nav)));
     var end = stringBuf.Length;
 
     var lstrs = stringBuf[lstart..rstart];
@@ -136,17 +142,13 @@ public ref partial struct Exec<Nav>
 
     stringBuf.Length = lstart;
 
-    fixed (char* cdata = &data.Span[0])
-    {
-      var cmp = new StringComparer(cdata);
-      lstrs.Sort(cmp);
-      rstrs.Sort(cmp);
-    }
+    lstrs.Sort();
+    rstrs.Sort();
 
     lidx = ridx = 0;
     while (lidx < lstrs.Length && ridx < rstrs.Length)
     {
-      var cmp = String(lstrs[lidx]).SequenceCompareTo(String(rstrs[ridx]));
+      var cmp = lstrs[lidx].CompareTo(rstrs[ridx]);
       if (cmp < 0)
         lidx++;
       else if (cmp > 0)
@@ -157,60 +159,44 @@ public ref partial struct Exec<Nav>
     return false;
   }
 
-  // unsafe hacks to get around ref of ref struct restrictions
-  private readonly unsafe struct StringComparer(char* data) : IComparer<Range>
-  {
-    private readonly char* data = data;
-
-    public int Compare(Range x, Range y) => String(x).SequenceCompareTo(String(y));
-
-    private ReadOnlySpan<char> String(Range range)
-    {
-      if (range.Start.IsFromEnd)
-        return DEFAULT_DATA.AsSpan()[range.Start.Value..range.End.Value];
-      return new Span<char>(data, range.End.Value)[range];
-    }
-  }
-
   private bool NodeSetsCompare(int lidx, int ridx, int minCmp, int maxCmp)
   {
     var less = minCmp < 0;
 
     if (!NextNode(lidx, out var nav))
       return false;
-    var lbound = NumberValue(nav);
+    var lbound = NodeNumberValue(nav);
     while (NextNode(lidx, out nav))
     {
-      var val = NumberValue(nav);
+      var val = NodeNumberValue(nav);
       lbound = less ? Math.Min(lbound, val) : Math.Max(lbound, val);
     }
 
     while (NextNode(ridx, out nav))
     {
-      var cmp = lbound.CompareTo(NumberValue(nav));
+      var cmp = lbound.CompareTo(NodeNumberValue(nav));
       if (cmp >= minCmp && cmp <= maxCmp)
         return true;
     }
     return false;
   }
 
-  private bool NodeSetValEqual(int nodes, TypedValue val, bool expected)
+  private bool NodeSetValEqual(int nodes, Value val, bool expected)
   {
     while (NextNode(nodes, out var nav))
     {
-      var nval = TypedValue.MakeString(data.AddRest(nav.StringValue(data.Rest)));
-      if (ValsEqual(nval, val) == expected)
+      if (ValsEqual(new(NodeStringValue(nav)), val) == expected)
         return true;
     }
     return false;
   }
 
-  private bool NodeSetValCompare(int nodes, TypedValue val, int minCmp, int maxCmp)
+  private bool NodeSetValCompare(int nodes, Value val, int minCmp, int maxCmp)
   {
     var right = NumberValue(val);
     while (NextNode(nodes, out var nav))
     {
-      var left = NumberValue(nav);
+      var left = NodeNumberValue(nav);
       var cmp = left.CompareTo(right);
       if (cmp >= minCmp && cmp <= maxCmp)
         return true;
@@ -218,27 +204,27 @@ public ref partial struct Exec<Nav>
     return false;
   }
 
-  private bool ValsEqual(TypedValue left, TypedValue right)
+  private bool ValsEqual(Value left, Value right)
   {
-    if (left.Type is ValueType.Bool || right.Type is ValueType.Bool)
+    if (left.Type is XPValueType.Bool || right.Type is XPValueType.Bool)
       return BoolValue(left) == BoolValue(right);
-    else if (left.Type is ValueType.Number || right.Type is ValueType.Number)
+    else if (left.Type is XPValueType.Number || right.Type is XPValueType.Number)
       return NumberValue(left) == NumberValue(right);
-    else if (left.Type is ValueType.String && right.Type is ValueType.String)
-      return String(StringValue(left)).SequenceEqual(String(StringValue(right)));
+    else if (left.Type is XPValueType.String && right.Type is XPValueType.String)
+      return left.String == right.String;
     else
       throw new InvalidOperationException($"{left.Type} {right.Type}");
   }
 
-  private int ValsCompare(TypedValue left, TypedValue right) =>
+  private int ValsCompare(Value left, Value right) =>
     NumberValue(left).CompareTo(NumberValue(right));
 
-  private TypedValue MathOp(int idx, Nav ctx)
+  private Value MathOp(int idx, XPNavigator ctx)
   {
-    ref readonly var op = ref Path.Vals[idx];
+    ref readonly var op = ref path.Vals[idx];
     var left = NumberValue(GetValue(op.Left, ctx));
     var right = NumberValue(GetValue(op.Right, ctx));
-    return TypedValue.MakeNumber(op.Type switch
+    return new(op.Type switch
     {
       ValOpType.Add => left + right,
       ValOpType.Sub => left - right,
@@ -249,69 +235,65 @@ public ref partial struct Exec<Nav>
     });
   }
 
-  public bool BoolValue(TypedValue val) => val.Type switch
+  private bool BoolValue(Value val) => val.Type switch
   {
-    ValueType.Bool => val.Value.Bool,
-    ValueType.Number => val.Value.Number != 0 && !double.IsNaN(val.Value.Number),
-    ValueType.String => val.Value.String.End.Value > val.Value.String.Start.Value,
-    ValueType.NodeSet => NextNode(val.Value.NodeSet, out _),
+    XPValueType.Bool => val.Bool,
+    XPValueType.Number => val.Number != 0 && !double.IsNaN(val.Number),
+    XPValueType.String => val.String.Length > 0,
+    XPValueType.NodeSet => NextNode(val.NodeSet, out _),
     _ => throw new InvalidOperationException($"{val.Type}"),
   };
 
-  public double NumberValue(TypedValue val) => val.Type switch
+  private double NumberValue(Value val) => val.Type switch
   {
-    ValueType.Bool => val.Value.Bool ? 1 : 0,
-    ValueType.Number => val.Value.Number,
-    ValueType.String => double.TryParse(
-      String(val.Value.String),
+    XPValueType.Bool => val.Bool ? 1 : 0,
+    XPValueType.Number => val.Number,
+    XPValueType.String => StringNumberValue(val.String),
+    XPValueType.NodeSet => NodeSetNumberValue(val.NodeSet),
+    _ => throw new InvalidOperationException($"{val.Type}"),
+  };
+
+  private double NodeSetNumberValue(int nodeSet) =>
+    StringNumberValue(NodeSetStringValue(nodeSet));
+
+  private double NodeNumberValue(XPNavigator nav) =>
+    StringNumberValue(NodeStringValue(nav));
+
+  private double StringNumberValue(ReadOnlySpan<char> val) =>
+    double.TryParse(
+      val,
       NumberStyles.Integer | NumberStyles.AllowDecimalPoint,
       null,
       out double parsed
-    ) ? parsed : double.NaN,
-    ValueType.NodeSet => NumberValue(TypedValue.MakeString(AddNodeStringValue(val.Value.NodeSet))),
-    _ => throw new InvalidOperationException($"{val.Type}"),
-  };
+    ) ? parsed : double.NaN;
 
-  public Range StringValue(TypedValue val) => val.Type switch
+  private string StringValue(Value val) => val.Type switch
   {
-    ValueType.Bool => val.Value.Bool ? TRUE_DATA : FALSE_DATA,
-    ValueType.Number => GetNumberStringValue(val.Value.Number),
-    ValueType.String => val.Value.String,
-    ValueType.NodeSet => AddNodeStringValue(val.Value.NodeSet),
+    XPValueType.Bool => val.Bool ? TRUE : FALSE,
+    XPValueType.Number => NumberStringValue(val.Number),
+    XPValueType.String => val.String,
+    XPValueType.NodeSet => new(NodeSetStringValue(val.NodeSet)),
     _ => throw new InvalidOperationException($"{val.Type}"),
   };
 
-  private Range GetNumberStringValue(double num)
+  public static string BoolStringValue(bool val) => val ? TRUE : FALSE;
+  public static string NumberStringValue(double num)
   {
     if (double.IsNaN(num))
-      return NAN_DATA;
+      return NAN;
     if (num == 0 || num == -0)
-      return ZERO_DATA;
+      return ZERO;
     if (double.IsPositiveInfinity(num))
-      return PINF_DATA;
+      return PINF;
     if (double.IsNegativeInfinity(num))
-      return NINF_DATA;
+      return NINF;
 
-    if (!num.TryFormat(data.Rest, out var len, "f"))
-      return NAN_DATA;
-    return data.AddRest(len);
+    return $"{num:f}";
   }
 
-  private Range AddNodeStringValue(int idx)
-  {
-    if (!NextNode(idx, out var nav))
-      return 0..0;
-    return AddNodeStringValue(nav);
-  }
+  private ReadOnlySpan<char> NodeSetStringValue(int idx) =>
+    NextNode(idx, out var nav) ? NodeStringValue(nav) : [];
 
-  private Range AddNodeStringValue(Nav nav) => data.AddRest(nav.StringValue(data.Rest));
-
-  private double NumberValue(Nav nav)
-  {
-    // we don't need to retain the string, so just reset the data buffer after
-    var start = data.Length;
-    var num = NumberValue(TypedValue.MakeString(AddNodeStringValue(nav)));
-    data.Length = start;
-    return num;
-  }
+  private ReadOnlySpan<char> NodeStringValue(XPNavigator nav) =>
+    dataBuf[..nav.StringValue(dataBuf)];
 }

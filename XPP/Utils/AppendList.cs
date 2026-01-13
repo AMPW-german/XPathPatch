@@ -28,6 +28,8 @@ public class AppendList<T> : IEnumerable<T> where T : notnull
 
   public ref T this[Index index] => ref this[index.GetOffset(length)];
 
+  public RangeEnumerator this[Range range] => new(this, range);
+
   public int Add(T val)
   {
     var idx = length++;
@@ -40,6 +42,15 @@ public class AppendList<T> : IEnumerable<T> where T : notnull
     var idx = length++;
     Ref(idx) = val;
     return idx;
+  }
+
+  public Range AddRange(params Span<T> vals)
+  {
+    // TODO: use span copy per chunk
+    var start = length;
+    for (var i = 0; i < vals.Length; i++)
+      Ref(length++) = vals[i];
+    return start..length;
   }
 
   private ref T Ref(int index)
@@ -70,5 +81,21 @@ public class AppendList<T> : IEnumerable<T> where T : notnull
     public void Dispose() { }
     public bool MoveNext() => ++index < list.length;
     public void Reset() => index = -1;
+  }
+
+  public struct RangeEnumerator(AppendList<T> list, Range range)
+  {
+    private readonly AppendList<T> list = list;
+    private readonly (int off, int len) range = range.GetOffsetAndLength(list.Length);
+    private int index = -1;
+
+    public RangeEnumerator GetEnumerator() => this;
+
+    public bool MoveNext() => ++index < range.len;
+    public ref T Current => ref list[range.off + index];
+
+    public int Offset => range.off;
+    public int Length => range.len;
+    public ref T this[Index index] => ref list[range.off + index.GetOffset(range.len)];
   }
 }

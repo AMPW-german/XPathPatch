@@ -1,5 +1,6 @@
 
 using System;
+using XPP.Doc;
 
 namespace XPP.Path;
 
@@ -26,17 +27,8 @@ public partial class XPath
     return new(source, paths, vals, data);
   }
 
-  public TypedValue Exec<Nav>(Nav nav, out Exec<Nav> exec) where Nav : IXPathNav<Nav>
-  {
-    exec = new(this);
-    return exec.Run(nav);
-  }
+  public XPathExecution Exec(XPNodeRef ctx) => new(this, ctx);
 
-  public static TypedValue Exec<Nav>(string source, Nav nav, out Exec<Nav> exec)
-    where Nav : IXPathNav<Nav>
-  {
-    var xpath = Parse(source);
-    exec = new(xpath);
-    return exec.Run(nav);
-  }
+  public static XPathExecution Exec(string source, XPNodeRef ctx) =>
+    Parse(source).Exec(ctx);
 }
