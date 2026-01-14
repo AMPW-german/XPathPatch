@@ -210,7 +210,7 @@ public ref struct Parser
     // Predicate*
     while (PeekType(TokenType.BOpen))
     {
-      left = ParsePredicate(left);
+      left = ParsePredicate(left, AstType.PathFilter);
     }
 
     return left;
@@ -241,7 +241,7 @@ public ref struct Parser
     return Push(new(type, tok));
   }
 
-  private int ParsePredicate(int left)
+  private int ParsePredicate(int left, AstType type)
   {
     if (!TakeType(out var tok, TokenType.BOpen))
       throw Invalid(TokenType.BOpen);
@@ -251,7 +251,7 @@ public ref struct Parser
     if (!TakeType(TokenType.BClose))
       throw Invalid(TokenType.BClose);
 
-    return Push(new(AstType.Filter, tok, left, right));
+    return Push(new(type, tok, left, right));
   }
 
   private int ParseExpr() => ParseOrExpr();
@@ -315,7 +315,7 @@ public ref struct Parser
   {
     var left = ParsePrimaryExpr();
     while (PeekType(TokenType.BOpen))
-      left = ParsePredicate(left);
+      left = ParsePredicate(left, AstType.ExprFilter);
     return left;
   }
 

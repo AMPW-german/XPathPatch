@@ -71,7 +71,8 @@ public enum AstType
   Axis, // (Tok:AxisName OpAxis 0:NodeTest) | (Tok:Attr 0:NodeTest) | (Tok:Self|Parent)
   NodeTest, // Tok:NameTest | (Tok:NodeType POpen PClose)
   ProcType, // 'processing-instruction' POpen Tok:String PClose
-  Filter, // 0:Expr Tok:BOpen 1:Expr BClose
+  PathFilter, // 0:(Axis|NodeTest) Tok:BOpen 1:Expr BClose
+  ExprFilter, // 0:Expr Tok:BOpen 1:Expr BClose
   Value, // Tok:VarRef|String|Number
   FuncCall, // Tok:FuncName POpen 0:(ArgList|Expr)? PClose
   ArgList, // 0:ArgList|Expr Tok:Comma 1:Expr

@@ -234,7 +234,7 @@ public ref struct Compiler
         case AstType.Axis:
         case AstType.NodeTest:
         case AstType.ProcType:
-        case AstType.Filter:
+        case AstType.PathFilter:
         case AstType.Union:
           compiler.ReserveExpr(idx);
           compiler.QueuePath(idx);
@@ -306,7 +306,7 @@ public ref struct Compiler
         case AstType.Axis:
         case AstType.NodeTest:
         case AstType.ProcType:
-        case AstType.Filter:
+        case AstType.PathFilter:
         case AstType.Union:
           compiler.AddExpr(ref state, new(ValOpType.Path, compiler.PathStart(idx)));
           break;
@@ -347,7 +347,7 @@ public ref struct Compiler
             FlagOrdered(axis.IsForward) | FlagDeduped(!axis.CanDupe && !lastFlags.HasFlag(StateFlags.IsDeduped)),
           AstType.NodeTest => lastFlags,
           AstType.ProcType => lastFlags,
-          AstType.Filter => lastFlags,
+          AstType.PathFilter => lastFlags,
           AstType.Union => StateFlags.IsNorm,
           _ => throw new InvalidOperationException($"{node.Type}"),
         };
@@ -453,7 +453,7 @@ public ref struct Compiler
           compiler.AddPath(new(PathOpType.NodeType) { NodeType = NodeType.ProcessingInstruction });
           hasAxis = false;
           break;
-        case AstType.Filter:
+        case AstType.PathFilter:
           // filter index will be backfilled
           state.PathIdx = compiler.AddPath(new(PathOpType.Filter));
           compiler.QueueExpr(node.Child1);
@@ -479,7 +479,7 @@ public ref struct Compiler
     {
       switch (node.Type)
       {
-        case AstType.Filter:
+        case AstType.PathFilter:
           compiler.paths[state.PathIdx] = new(PathOpType.Filter) { Filter = compiler.ValOpIndex(node.Child1) };
           break;
         case AstType.Union:
@@ -529,7 +529,7 @@ public ref struct Compiler
       case AstType.Axis:
       case AstType.NodeTest:
       case AstType.ProcType:
-      case AstType.Filter:
+      case AstType.PathFilter:
       case AstType.Union:
       case AstType.Value: // Value is a leaf
         visitor.Visit(ref this, idx, in node, ref states[idx]);
@@ -578,7 +578,7 @@ public ref struct Compiler
       case AstType.Union: // union paths are separate
         visitor.Visit(ref this, idx, in node, ref states[idx]);
         break;
-      case AstType.Filter:
+      case AstType.PathFilter:
         visitor.Visit(ref this, idx, in node, ref states[idx]);
         WalkPath(node.Child0, ref visitor); // walk parent path, but not predicate expression
         break;

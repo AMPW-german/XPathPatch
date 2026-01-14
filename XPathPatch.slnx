@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="XPathPatch.csproj" />
+  <Project Path="XPP.Tests/XPathPatch.Tests.csproj" />
+</Solution>
