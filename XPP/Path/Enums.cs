@@ -91,6 +91,7 @@ public enum PathOpType
   Context, // start from context
   Root, // start from root
   Union, // start from union of [Paths]
+  Expr, // start from expression output
   Axis, // walk axis from Parent
   NodeType, // filter nodes from Parent by NodeType
   NameTest, // filter nodes from Parent by [ns]:[name] (0:0 is *, 0:>0 is name, >0:>0 is ns:name, >0:0 is ns:*)
@@ -319,6 +320,7 @@ public static partial class Extensions
 
   extension(PathOpType type)
   {
-    public bool IsRoot => type is PathOpType.Context or PathOpType.Root or PathOpType.Union;
+    public bool IsRoot => type is
+      PathOpType.Context or PathOpType.Root or PathOpType.Union or PathOpType.Expr;
   }
 }

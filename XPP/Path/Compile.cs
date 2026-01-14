@@ -27,8 +27,8 @@ public readonly struct PathOp(PathOpType type)
   public Range Ns { get => v0..v1; init => (v0, v1) = (value.Start.Value, value.End.Value); }
   public Range Name { get => v2..v3; init => (v2, v3) = (value.Start.Value, value.End.Value); }
 
-  // Filter
-  public int Filter { get => v0; init => v0 = value; }
+  // Filter/Expr
+  public int Expr { get => v0; init => v0 = value; }
 
   // Normalize
   public bool Dedupe { get => v0 != 0; init => v0 = value ? 1 : 0; }
@@ -235,6 +235,7 @@ public ref struct Compiler
         case AstType.NodeTest:
         case AstType.ProcType:
         case AstType.PathFilter:
+        case AstType.ExprFilter:
         case AstType.Union:
           compiler.ReserveExpr(idx);
           compiler.QueuePath(idx);
@@ -307,6 +308,7 @@ public ref struct Compiler
         case AstType.NodeTest:
         case AstType.ProcType:
         case AstType.PathFilter:
+        case AstType.ExprFilter:
         case AstType.Union:
           compiler.AddExpr(ref state, new(ValOpType.Path, compiler.PathStart(idx)));
           break;
@@ -348,7 +350,11 @@ public ref struct Compiler
           AstType.NodeTest => lastFlags,
           AstType.ProcType => lastFlags,
           AstType.PathFilter => lastFlags,
+          AstType.ExprFilter => StateFlags.IsNorm,
           AstType.Union => StateFlags.IsNorm,
+          // user vars and funcs could give us anything
+          AstType.Value => 0,
+          AstType.FuncCall => 0,
           _ => throw new InvalidOperationException($"{node.Type}"),
         };
 
@@ -459,12 +465,24 @@ public ref struct Compiler
           compiler.QueueExpr(node.Child1);
           hasAxis = false;
           break;
+        case AstType.ExprFilter:
+          // path and expr index will be backfilled
+          state.PathIdx = compiler.AddPath(new(PathOpType.Filter));
+          compiler.AddPath(new(PathOpType.Expr));
+          compiler.QueueExpr(node.Child0);
+          compiler.QueueExpr(node.Child1);
+          break;
         case AstType.Union:
           // path indices will be backfilled
           state.PathIdx = compiler.AddPath(new(PathOpType.Union));
           compiler.QueuePath(node.Child0);
           compiler.QueuePath(node.Child1);
           hasAxis = false;
+          break;
+        case AstType.Value or AstType.FuncCall:
+          // expr index will be backfilled
+          state.PathIdx = compiler.AddPath(new(PathOpType.Expr));
+          compiler.QueueExpr(idx);
           break;
         default:
           throw new InvalidOperationException($"{node.Type}");
@@ -480,13 +498,20 @@ public ref struct Compiler
       switch (node.Type)
       {
         case AstType.PathFilter:
-          compiler.paths[state.PathIdx] = new(PathOpType.Filter) { Filter = compiler.ValOpIndex(node.Child1) };
+          compiler.paths[state.PathIdx] = new(PathOpType.Filter) { Expr = compiler.ValOpIndex(node.Child1) };
+          break;
+        case AstType.ExprFilter:
+          compiler.paths[state.PathIdx] = new(PathOpType.Filter) { Expr = compiler.ValOpIndex(node.Child1) };
+          compiler.paths[state.PathIdx + 1] = new(PathOpType.Expr) { Expr = compiler.ValOpIndex(node.Child0) };
           break;
         case AstType.Union:
           compiler.paths[state.PathIdx] = new(PathOpType.Union)
           {
             Paths = (compiler.PathStart(node.Child0), compiler.PathStart(node.Child1))
           };
+          break;
+        case AstType.Value or AstType.FuncCall:
+          compiler.paths[state.PathIdx] = new(PathOpType.Expr) { Expr = compiler.ValOpIndex(node.Child0)};
           break;
       }
     }
@@ -530,6 +555,7 @@ public ref struct Compiler
       case AstType.NodeTest:
       case AstType.ProcType:
       case AstType.PathFilter:
+      case AstType.ExprFilter:
       case AstType.Union:
       case AstType.Value: // Value is a leaf
         visitor.Visit(ref this, idx, in node, ref states[idx]);
@@ -582,16 +608,25 @@ public ref struct Compiler
         visitor.Visit(ref this, idx, in node, ref states[idx]);
         WalkPath(node.Child0, ref visitor); // walk parent path, but not predicate expression
         break;
-      // expression nodes should not be direct children of any path node except Filter
-      case AstType.Value:
+      case AstType.ExprFilter:
+        // both children are treated as expressions
+        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        break;
+      // variables and user funcs could produce nodes, so they are allowed as roots
+      case AstType.Value when node.Token.Type is TokenType.VarRef:
       case AstType.FuncCall:
+        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        break;
+      // expression nodes that couldn't produce nodes should not be children
+      case AstType.Value:
       case AstType.ArgList:
       case AstType.BoolOp:
       case AstType.CompareOp:
       case AstType.MathOp:
       case AstType.Negate:
+        throw new InvalidOperationException($"{node.Type} cannot be in a Path");
       default:
-        throw new InvalidOperationException($"Path {node.Type}");
+        throw new InvalidOperationException($"Unknown Ast node {node.Type}");
     }
   }
 

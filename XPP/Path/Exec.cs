@@ -22,6 +22,8 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
 
     public bool FirstEnd;
     public bool SecondEnd;
+
+    public int NodeSet;
   }
 
   private class ResultBuf() : ThreadBuf<ResultBuf, XPNavigator>(MAX_SORT_NODESET);
@@ -59,7 +61,7 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
     switch (op.Type)
     {
       case PathOpType.Context:
-        if (state.Index++ > 0)
+        if (++state.Index > 0)
         {
           nav = default;
           return false;
@@ -67,7 +69,7 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
         nav = state.XPNavigator.Clone();
         return true;
       case PathOpType.Root:
-        if (state.Index++ > 0)
+        if (++state.Index > 0)
         {
           nav = default;
           return false;
@@ -76,14 +78,23 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
         return true;
       case PathOpType.Union:
         return NextUnion(idx, out nav);
+      case PathOpType.Expr:
+        if (++state.Index == 0)
+        {
+          var val = GetValue(op.Expr, state.XPNavigator);
+          if (val.Type != XPValueType.NodeSet)
+            throw new InvalidOperationException($"Expression must produce NodeSet");
+          state.NodeSet = val.NodeSet;
+        }
+        return NextNode(state.NodeSet, out nav);
       case PathOpType.Axis:
         return NextAxis(idx, out nav);
       case PathOpType.NodeType:
         while (NextNode(idx + 1, out state.XPNavigator))
         {
+          state.Index = states[idx + 1].Index;
           if (op.NodeType == NodeType.Node || state.XPNavigator.Type() == op.NodeType)
           {
-            state.Index++;
             nav = state.XPNavigator.Clone();
             return true;
           }
@@ -93,9 +104,9 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
       case PathOpType.NameTest:
         while (NextNode(idx + 1, out state.XPNavigator))
         {
+          state.Index = states[idx + 1].Index;
           if (NameTest(in op, ref state.XPNavigator))
           {
-            state.Index++;
             nav = state.XPNavigator.Clone();
             return true;
           }
@@ -105,11 +116,12 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
       case PathOpType.Filter:
         while (NextNode(idx + 1, out state.XPNavigator))
         {
-          var val = GetValue(op.Filter, state.XPNavigator);
+          state.Index = states[idx + 1].Index;
+          var val = GetValue(op.Expr, state.XPNavigator);
           if (val.Type switch
           {
-            // Index starts at -1, position starts at 1
-            XPValueType.Number => (state.Index + 2) == val.Number,
+            // Index starts at 0, position starts at 1
+            XPValueType.Number => (state.Index + 1) == val.Number,
             _ => BoolValue(val),
           })
           {
@@ -147,7 +159,7 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
     return (ns.Length, name.Length) switch
     {
       (_, > 0) => nav.HasNs(ns) && nav.HasName(name),
-      ( > 0, 0) => nav.HasName(ns),
+      ( > 0, 0) => nav.HasNs(ns),
       _ => true,
     };
   }
@@ -196,7 +208,7 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
     ref var state = ref states[idx];
     ref readonly var op = ref path.Paths[idx];
     var (p1, p2) = op.Paths;
-    if (state.Index++ == 0)
+    if (++state.Index == 0)
     {
       ResetPath(p1, state.XPNavigator);
       ResetPath(p2, state.XPNavigator);
@@ -268,6 +280,6 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
         resultBuf.Length = start;
       state.Nodes = 0..0;
     }
-    states[idx] = new() { XPNavigator = ctx.Clone(), Index = 0 };
+    states[idx] = new() { XPNavigator = ctx.Clone(), Index = -1 };
   }
 }
