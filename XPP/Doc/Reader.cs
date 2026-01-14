@@ -24,7 +24,7 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
     }
   }
 
-  public override string BaseURI => "";
+  public override string BaseURI => nt.Add("");
 
   public override int Depth => state.Depth;
 
@@ -33,9 +33,9 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
   public override bool IsEmptyElement =>
     state.Node.Type is XPType.Element && !state.End && !state.FirstContent().Valid;
 
-  public override string LocalName => state.Node.Name.Local;
+  public override string LocalName => nt.Add(state.Node.Name.Local);
 
-  public override string NamespaceURI => state.Node.Name.NsUri;
+  public override string NamespaceURI => nt.Add(state.Node.Name.NsUri);
 
   public override XmlNameTable NameTable => nt; // TODO: should we use this in doc?
 
@@ -59,10 +59,10 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
     }
   }
 
-  public override string Prefix => state.Node.Name.Prefix;
+  public override string Prefix => nt.Add(state.Node.Name.Prefix);
 
   public override ReadState ReadState =>
-    state.Started
+    !state.Started
       ? ReadState.Initial
       : state.Valid
         ? ReadState.Interactive
@@ -127,17 +127,14 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
     return string.IsNullOrEmpty(val) ? null : val;
   }
 
-  public override string LookupNamespace(string prefix)
+  public override string LookupNamespace(string prefix) => nt.Add(prefix switch
   {
     // TODO: xml prefix uri
-    if (prefix is "" or "xml")
-      return prefix;
-    if (prefix is XPDocument.XMLNS_PREFIX)
-      return XPDocument.XMLNS_URI;
-    if (!state.Node.ResolveName(prefix, "", out var name))
-      return null;
-    return name.NsUri;
-  }
+    "" or "xml" => prefix,
+    XPDocument.XMLNS_PREFIX => XPDocument.XMLNS_URI,
+    _ when state.Node.ResolveName(prefix, "", out var name) => name.NsUri,
+    _ => null,
+  });
 
   private bool MoveIfValid(State next)
   {
@@ -219,9 +216,9 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
 
     public State FirstAttr()
     {
-      if (!Started || End || AttrIndex == -1 || !Valid)
+      if (End || AttrIndex == -1 || !Valid)
         return Invalid;
-      return With(node: Node.FirstAttr, depth: Depth + 1, attrIndex: 0);
+      return With(started: true, node: Node.FirstAttr, depth: Depth + 1, attrIndex: 0);
     }
 
     public State NextAttr()
@@ -230,7 +227,7 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
       {
         if (Depth <= 0)
           return Invalid;
-        return With(node: Node.NextSibling, attrIndex: AttrIndex + 1);
+        return With(started: true, node: Node.NextSibling, attrIndex: AttrIndex + 1);
       }
       return FirstAttr();
     }
@@ -246,7 +243,7 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
     {
       if (End)
         return Invalid;
-      return With(node: Node.FirstContent, attrIndex: 0, depth: Depth + 1);
+      return With(started: true, node: Node.FirstContent, attrIndex: 0, depth: Depth + 1);
     }
 
     public State NextContent()
@@ -267,7 +264,7 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
     {
       if (Node.Type is not XPType.Element)
         return Invalid;
-      return With(attrIndex: -1, end: true);
+      return With(started: true, attrIndex: -1, end: true);
     }
   }
 }

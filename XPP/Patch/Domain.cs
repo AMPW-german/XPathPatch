@@ -15,13 +15,30 @@ public class PatchDomain
   protected virtual string FilePathAttr => "Path";
   protected virtual XmlSerializer PatchDeserializer =>
     field ??= new(typeof(PatchFile), new XmlRootAttribute(PatchElName));
-  protected virtual PatchOpDeserializer OpDeserializer => field ??= new();
+  public virtual PatchOpDeserializer OpDeserializer => field ??= new();
 
   public readonly XPDocument Doc;
   protected readonly List<PatchMod> mods = [];
 
   public XPNodeRef Root => Doc.LatestRoot.FirstContent;
   public virtual IEnumerable<PatchMod> Mods => mods;
+
+  public IEnumerable<XPNodeRef> Patches
+  {
+    get
+    {
+      foreach (var mod in Mods)
+      {
+        var child = mod.Node.FirstContent;
+        while (child.Valid)
+        {
+          if (child.Name == new XPName("", "", PatchElName))
+            yield return child;
+          child = child.NextSibling;
+        }
+      }
+    }
+  }
 
   public PatchDomain()
   {

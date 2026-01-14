@@ -20,8 +20,8 @@ public class PatchLog
     actions = new(new()
     {
       Type = ActionType.Root,
-      InVersion = 0,
-      OutVersion = 0,
+      InVersion = -1,
+      OutVersion = -1,
       Context = domain.Root.Id,
       Target = XPNodeId.Invalid,
       Source = XPNodeId.Invalid,
@@ -87,6 +87,7 @@ public class PatchLog
       }));
     }
 
+    public bool Started => Action.InVersion != -1;
     public void Start()
     {
       ref var action = ref treeNode.Value;
@@ -110,6 +111,7 @@ public class PatchLog
       }
     }
 
+    public bool Finished => Action.OutVersion != -1;
     public void Finish()
     {
       ref var action = ref treeNode.Value;

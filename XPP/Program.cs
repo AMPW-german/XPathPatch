@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Xml;
 using System.Xml.XPath;
@@ -37,11 +38,12 @@ public static class Program
     // doc.Load(TestFile);
 
     // TestXPath(new NavAdapter(doc.DocumentElement.CreateNavigator()));
-    TestXPDoc(doc);
+    // TestXPDoc(doc);
     // TestXPDocRead(doc);
     // SpeedTest(TestFolder);
     // TestReadCompare(TestFolder);
     // TestImportRead(TestFolder);
+    TestPatch();
   }
 
   private static void TestXPDoc(XmlDocument doc)
@@ -96,12 +98,39 @@ public static class Program
   {
     while (r.Read())
     {
-      Console.WriteLine($"- {r.NodeType} {r.Name} {r.Value}");
+      PrintReaderState(r);
       while (r.MoveToNextAttribute())
-      {
-        Console.WriteLine($"- {r.NodeType} {r.Name} {r.Value}");
-      }
+        PrintReaderState(r);
     }
+  }
+
+  private static readonly StringBuilder sb = new();
+  private static void PrintReaderState(XmlReader r)
+  {
+    sb.Clear();
+    for (var i = r.Depth; --i >= 0;)
+      sb.Append("  ");
+    sb.Append('-');
+    AddReaderState(r.NodeType);
+    AddReaderState(r.NamespaceURI);
+    AddReaderState(r.Prefix);
+    AddReaderState(r.LocalName);
+    AddReaderState(r.Value);
+    // AddReaderState(r.IsDefault);
+    AddReaderState(r.ReadState);
+    Console.WriteLine(sb.ToString());
+  }
+
+  private static void AddReaderState<T>(T val, [CallerArgumentExpression(nameof(val))] string valStr = null)
+  {
+    var name = valStr.AsSpan(valStr.IndexOf('.') + 1);
+    sb.Append(' ').Append(name).Append(':');
+    if (val is string str)
+      sb.Append('"').Append(str).Append('"');
+    else if (val is null)
+      sb.Append("<null>");
+    else
+      sb.Append(val);
   }
 
   private static void TestReadCompare(string basePath)
@@ -327,6 +356,38 @@ public static class Program
     {
       ref var path = ref xpath.Paths[i];
       Console.WriteLine($"P{i:00} {path.Type} {path.Paths} {path.Name}");
+    }
+  }
+
+  private static void TestPatch()
+  {
+    const string fileDoc = """
+      <A>
+        <B C="v1" />
+      </A>
+    """;
+    const string patchDoc = """
+      <Patch>
+        <Copy Path="Mod/A/B/@C" From="'v2'" />
+        <Copy Path="Mod" From="Mod/A" Pos="Append" />
+        <Delete Path="//B/@*" />
+      </Patch>
+    """;
+
+    var domain = new PatchDomain();
+    var mod = domain.AddMod("Test");
+    mod.Node.Import(XmlReader.Create(new StringReader(fileDoc)));
+    mod.Node.Import(XmlReader.Create(new StringReader(patchDoc)));
+
+    var executor = new PatchExecutor(domain);
+    executor.StepToEnd();
+
+    var doc = domain.Doc;
+
+    for (var i = 0; i <= doc.Version; i++)
+    {
+      Console.Write($"{i}: ");
+      Console.WriteLine(doc.Root(i).FirstContent.Nav.OuterXml());
     }
   }
 }

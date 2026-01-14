@@ -1,5 +1,6 @@
 
 using System;
+using System.Collections.Generic;
 using XPP.Doc;
 using XPP.Path;
 
@@ -60,6 +61,27 @@ public struct PatchAction
 
 public static class PatchActions
 {
+  public delegate void ActionDelegate(
+    PatchOpDeserializer deserializer, PatchLog.ActionRef action);
+
+  public static readonly Dictionary<ActionType, ActionDelegate> Delegates = new() {
+    { ActionType.Root, Root },
+    { ActionType.OpPatch, OpPatch },
+    { ActionType.OpCopy, OpCopy },
+    { ActionType.OpMerge, OpMerge },
+    { ActionType.OpDelete, OpDelete },
+    { ActionType.OpIf, OpIf },
+    { ActionType.OpIfAny, OpIfAny },
+    { ActionType.OpIfNone, OpIfNone },
+    { ActionType.OpWith, OpWith },
+    { ActionType.WithCtx, WithCtx },
+    { ActionType.Insert, Insert },
+    { ActionType.InsertText, InsertText },
+    { ActionType.Set, Set },
+    { ActionType.Remove, Remove },
+    { ActionType.Merge, Merge },
+  };
+
   public static void Root(
     PatchOpDeserializer deserializer, PatchLog.ActionRef action)
   { }
@@ -155,7 +177,7 @@ public static class PatchActions
       default:
         throw new InvalidOperationException($"{action.Action.Position}");
     }
-    var copy = action.AddChild(ActionType.OpCopy, target: target.Id);
+    var copy = action.AddChild(ActionType.Set, target: target.Id);
     copy.SetSourceResult(new ExecValue(strVal));
   }
 

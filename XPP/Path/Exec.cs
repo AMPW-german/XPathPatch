@@ -108,7 +108,8 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
           var val = GetValue(op.Filter, state.XPNavigator);
           if (val.Type switch
           {
-            XPValueType.Number => throw new NotImplementedException(),
+            // Index starts at -1, position starts at 1
+            XPValueType.Number => (state.Index + 2) == val.Number,
             _ => BoolValue(val),
           })
           {
