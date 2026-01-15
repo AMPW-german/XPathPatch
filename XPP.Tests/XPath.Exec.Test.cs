@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Xml;
 using XPP.Doc;
 using XPP.Path;
@@ -22,56 +21,6 @@ public partial class XPathTests
       new("(A/B/C)[1]", "A/B#0/C"))
   );
 
-  [Serializable]
-  public record class PathStep(string Name, XPType Type, int Index)
-  {
-    public static implicit operator PathStep(string path)
-    {
-      string desc, idx;
-      var split = path.IndexOf('#');
-      if (split == -1)
-        (desc, idx) = (path, "0");
-      else
-        (desc, idx) = (path[..split], path[(split + 1)..]);
-
-      var index = int.Parse(idx);
-      return desc[0] switch
-      {
-        '\'' => new("", XPType.Text, index),
-        '[' => new("", XPType.CData, index),
-        '?' => new(desc[1..], XPType.ProcInst, index),
-        '!' => new("", XPType.Comment, index),
-        '@' => new(desc[1..], XPType.Attribute, index),
-        ':' => new(desc[1..], XPType.Namespace, index),
-        _ => new(desc, XPType.Element, index),
-      };
-    }
-
-    public override string ToString()
-    {
-      var prefix = Type switch
-      {
-        XPType.Text => "'",
-        XPType.CData => "[",
-        XPType.ProcInst => "?",
-        XPType.Comment => "!",
-        XPType.Attribute => "@",
-        XPType.Namespace => ":",
-        _ => "",
-      };
-      return $"{prefix}{Name}#{Index}";
-    }
-  }
-
-  public class Path : List<PathStep>, IEquatable<Path>
-  {
-    public bool Equals(Path other) => Enumerable.SequenceEqual(this, other);
-    public override string ToString() => string.Join('/', this);
-    public static implicit operator Path(string path) =>
-      [.. path.Split('/').Select(p => (PathStep)p)];
-  }
-
-  [Serializable]
   public record class ExecTest(string XPath, params List<Path> Paths);
 
   private static IEnumerable<object[]> ExecDoc(string xml, params List<ExecTest> tests)
@@ -92,29 +41,9 @@ public partial class XPathTests
     {
       if (res.Type is not XPValueType.NodeSet)
         throw new InvalidOperationException($"{res.Type}");
-      actual.Add(NodeToPath(res.Node));
+      actual.Add(Path.FromNode(res.Node));
     }
 
     CollectionAssert.AreEqual(expected, actual, ListMsg(expected, actual));
-  }
-
-  private static Path NodeToPath(XPNodeRef node)
-  {
-    var path = new Path();
-    while (node.Valid && node.Type is not XPType.Document)
-    {
-      var index = 0;
-      var prev = node.PrevSibling;
-      while (prev.Valid)
-      {
-        if (prev.Type == node.Type && prev.Name == node.Name)
-          index++;
-        prev = prev.PrevSibling;
-      }
-      path.Add(new(node.Name.Local, node.Type, index));
-      node = node.Parent;
-    }
-    path.Reverse();
-    return path;
   }
 }

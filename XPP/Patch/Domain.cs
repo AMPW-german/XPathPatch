@@ -1,5 +1,6 @@
 
 using System.Collections.Generic;
+using System.IO;
 using System.Xml;
 using System.Xml.Serialization;
 using XPP.Doc;
@@ -61,10 +62,15 @@ public class PatchDomain
     public readonly string Id = Id;
     public readonly XPNodeRef Node = Node;
 
-    public XPNodeRef ImportFile(string fileName)
+    public XPNodeRef ImportFile(string fileName) => Import(fileName,
+      XmlReader.Create(fileName, new() { IgnoreWhitespace = true }));
+
+    public XPNodeRef ImportXml(string fileName, string xml) => Import(fileName,
+      XmlReader.Create(new StringReader(xml), new() { IgnoreWhitespace = true }));
+
+    public XPNodeRef Import(string fileName, XmlReader reader)
     {
-      var node = Node.Import(
-        XmlReader.Create(fileName, new() { IgnoreWhitespace = true }));
+      var node = Node.Import(reader);
       node.SetAttribute(Domain.FilePathAttr, fileName.Replace('\\', '/'));
       return node;
     }

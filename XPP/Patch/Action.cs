@@ -201,7 +201,7 @@ public static class PatchActions
           throw new InvalidOperationException(
             $"Path must return NodeSet, not {srcVal.Type}");
         var source = srcVal.Node;
-        if (source.Valid)
+        if (!source.Valid)
           continue;
         if (source.Type is not XPType.Element)
           throw new InvalidOperationException(

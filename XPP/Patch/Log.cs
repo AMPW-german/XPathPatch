@@ -47,9 +47,9 @@ public class PatchLog
     private XPNodeRef MkNodeRef(XPNodeId id) =>
       Valid && id.Valid ? new(Doc, id) : XPNodeRef.Invalid;
 
-    public XPNodeRef Context => MkNodeRef(Action.Context);
-    public XPNodeRef Target => MkNodeRef(Action.Target);
-    public XPNodeRef Source => MkNodeRef(Action.Source);
+    public XPNodeRef Context => Valid ? MkNodeRef(Action.Context) : XPNodeRef.Invalid;
+    public XPNodeRef Target => Valid ? MkNodeRef(Action.Target) : XPNodeRef.Invalid;
+    public XPNodeRef Source => Valid ? MkNodeRef(Action.Source) : XPNodeRef.Invalid;
 
     public AppendList<ExecValue>.RangeEnumerator TargetResult =>
       Log.pathResults[Action.TargetResult];

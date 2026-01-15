@@ -1,5 +1,4 @@
 
-using System;
 using System.Collections.Generic;
 using XPP.Path;
 
@@ -27,7 +26,6 @@ public partial class XPathTests
     )],
   ];
 
-  [Serializable]
   public record struct TestToken(TokenType Type, string Value)
   {
     public static implicit operator TestToken((TokenType, string) pair) =>

@@ -1,5 +1,4 @@
 
-using System;
 using System.Collections.Generic;
 using XPP.Path;
 
@@ -48,7 +47,6 @@ public partial class XPathTests
         new(AstType.NodeTest, "*")))],
   ];
 
-  [Serializable]
   public record class TestAst(AstType Type, string Token, TestAst Left = null, TestAst Right = null)
   {
     public static void Equals(TreeComparer t, string source, TestAst exp, AstNode[] nodes, int index)

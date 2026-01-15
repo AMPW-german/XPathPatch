@@ -38,7 +38,6 @@ public partial class XPathTests
     )],
   ];
 
-  [Serializable]
   public record class TestCExpr(
     ValOpType Type,
     string String = null,
@@ -84,7 +83,6 @@ public partial class XPathTests
       }
     }
   }
-  [Serializable]
   public record class TestCPath(
     PathOpType Type,
     TestCPath UnionL = null, TestCPath UnionR = null,
