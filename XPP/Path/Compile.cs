@@ -253,8 +253,12 @@ public ref struct Compiler
         case AstType.FuncCall:
           var func = XPath.ParseLibraryFunc(compiler.TokStr(node.Token));
           // reserve spot for func op, then reserve args
-          var argStart = 1 + compiler.ReserveExpr(idx);
-          var argCount = ReserveArgs(ref compiler, node.Child0);
+          compiler.ReserveExpr(idx);
+          var (argStart, argCount) = ReserveArgs(ref compiler, node.Child0);
+          var (minArgs, maxArgs) = func.ArgCounts;
+          if (argCount < minArgs || argCount > maxArgs)
+            throw new InvalidOperationException(
+              $"invalid argcount for {compiler.TokStr(node.Token)}: {argCount} <> [{minArgs},{maxArgs}]");
           var argRange = argStart..(argStart + argCount);
           if (func != LibraryFunc.Invalid)
             compiler.AddExpr(ref state, new(ValOpType.Func, func, argRange));
@@ -283,15 +287,18 @@ public ref struct Compiler
       }
     }
 
-    private static int ReserveArgs(ref Compiler compiler, int idx)
+    private static (int first, int count) ReserveArgs(ref Compiler compiler, int idx)
     {
       if (idx == -1)
-        return 0;
+        return (0, 0);
       ref readonly AstNode node = ref compiler.nodes[idx];
       if (node.Type == AstType.ArgList)
-        return ReserveArgs(ref compiler, node.Child0) + ReserveArgs(ref compiler, node.Child1);
-      compiler.ReserveExpr(idx);
-      return 1;
+      {
+        var (first, cleft) = ReserveArgs(ref compiler, node.Child0);
+        var (_, cright) = ReserveArgs(ref compiler, node.Child1);
+        return (first, cleft + cright);
+      }
+      return (compiler.ReserveExpr(idx), 1);
     }
   }
 
@@ -511,7 +518,7 @@ public ref struct Compiler
           };
           break;
         case AstType.Value or AstType.FuncCall:
-          compiler.paths[state.PathIdx] = new(PathOpType.Expr) { Expr = compiler.ValOpIndex(node.Child0)};
+          compiler.paths[state.PathIdx] = new(PathOpType.Expr) { Expr = compiler.ValOpIndex(node.Child0) };
           break;
       }
     }

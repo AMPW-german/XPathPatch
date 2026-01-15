@@ -18,7 +18,16 @@ public partial class XPathTests
       </A>
       """,
       new("A/B/C[1]", "A/B#0/C", "A/B#1/C"),
-      new("(A/B/C)[1]", "A/B#0/C"))
+      new("(A/B/C)[1]", "A/B#0/C"),
+      new("//*[local-name()='B']", "A/B#0", "A/B#1")),
+    ExecDoc("""
+      <A>
+        <B><C V="1"/><C V="2"/><C V="3"/></B>
+        <B><C V="4"/><C V="5"/><C V="6"/></B>
+      </A>
+      """,
+      new("A/B[sum(C/@V)=6]", "A/B#0"),
+      new("A/B[sum(C/@V)=15]", "A/B#1"))
   );
 
   public record class ExecTest(string XPath, params List<Path> Paths);

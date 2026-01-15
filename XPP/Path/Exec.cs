@@ -30,6 +30,7 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
   private class DedupeBuf() : ThreadBuf<DedupeBuf, XPNavigator>(MAX_SORT_NODESET);
   private class DataBuf() : ThreadBuf<DataBuf, char>(MAX_DATA_SIZE);
   private class StringBuf() : ThreadBuf<StringBuf, string>(MAX_SORT_NODESET);
+  private class ArgBuf() : ThreadBuf<ArgBuf, Value>(MAX_SORT_NODESET);
 
   private const string TRUE = "true";
   private const string FALSE = "false";
@@ -46,6 +47,7 @@ public ref partial struct Exec(XPath path, XPNavigator ctx)
   private readonly Span<XPNavigator> dedupeBuf = DedupeBuf.Span;
   private readonly Span<char> dataBuf = DataBuf.Span;
   private SpanBuf<string> stringBuf = StringBuf.Buf;
+  private SpanBuf<Value> argBuf = ArgBuf.Buf;
 
   private bool started = false;
   private Value result;

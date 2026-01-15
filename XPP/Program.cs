@@ -37,13 +37,15 @@ public static class Program
     doc.LoadXml(XML);
     // doc.Load(TestFile);
 
+    DebugPrint(XPath.Parse("A/B[sum(C/@V)=15]"));
+
     // TestXPath(new NavAdapter(doc.DocumentElement.CreateNavigator()));
     // TestXPDoc(doc);
     // TestXPDocRead(doc);
     // SpeedTest(TestFolder);
     // TestReadCompare(TestFolder);
     // TestImportRead(TestFolder);
-    TestPatch();
+    // TestPatch();
   }
 
   private static void TestXPDoc(XmlDocument doc)

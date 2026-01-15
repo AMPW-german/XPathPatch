@@ -36,6 +36,26 @@ public partial class XPathTests
         new(PathOpType.Filter, Expr: new(ValOpType.Number, Number: 1)),
       ]
     )],
+    ["A/B[sum(C/@V)=15]", new TestCExpr(ValOpType.Path, Path: [
+      new(PathOpType.Context),
+      new(PathOpType.Axis, Axis: AxisType.Child),
+      new(PathOpType.NameTest, Ns: "", Name: "A"),
+      new(PathOpType.Axis, Axis: AxisType.Child),
+      new(PathOpType.NameTest, Ns: "", Name: "B"),
+      new(PathOpType.Filter, Expr: new(ValOpType.Eq,
+        Left: new(ValOpType.Func, Func: LibraryFunc.Sum, Args: [
+          new(ValOpType.Path, Path: [
+            new(PathOpType.Context),
+            new(PathOpType.Axis, Axis: AxisType.Child),
+            new(PathOpType.NameTest, Ns: "", Name: "C"),
+            new(PathOpType.Axis, Axis: AxisType.Attribute),
+            new(PathOpType.NameTest, Ns: "", Name: "V"),
+            new(PathOpType.Normalize)
+          ])
+        ]),
+        Right: new(ValOpType.Number, Number: 15)
+      )),
+    ])],
   ];
 
   public record class TestCExpr(
@@ -71,13 +91,13 @@ public partial class XPathTests
       if (Left != null)
         t.Child($"Left", t => Left.Equals(t, xpath, op.Left));
       if (Right != null)
-        t.Child($"Right", t => Left.Equals(t, xpath, op.Right));
+        t.Child($"Right", t => Right.Equals(t, xpath, op.Right));
       if (Args != null)
       {
         var start = op.Args.Start.Value;
         var end = op.Args.End.Value;
         var len = end - start;
-        t.CmpThrow("Argc", Args.Length != len, Args.Length, len);
+        t.CmpThrow("Argc", Args.Length == len, Args.Length, len);
         for (var i = 0; i < len; i++)
           t.Child($"Arg {i}", t => Args[i].Equals(t, xpath, start + i));
       }

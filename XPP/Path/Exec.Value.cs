@@ -7,7 +7,7 @@ namespace XPP.Path;
 
 public ref partial struct Exec
 {
-  private ref struct Value(XPValueType type)
+  private struct Value(XPValueType type)
   {
     public XPValueType Type = type;
     public bool Bool;
@@ -44,7 +44,7 @@ public ref partial struct Exec
       case ValOpType.Add or ValOpType.Sub or ValOpType.Mult or ValOpType.Mod or ValOpType.Div:
         return MathOp(idx, ctx);
       case ValOpType.Func:
-        throw new NotImplementedException();
+        return FuncValue(idx, ctx);
       case ValOpType.UserFunc:
         throw new NotImplementedException();
       default:

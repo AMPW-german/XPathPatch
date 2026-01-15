@@ -323,4 +323,39 @@ public static partial class Extensions
     public bool IsRoot => type is
       PathOpType.Context or PathOpType.Root or PathOpType.Union or PathOpType.Expr;
   }
+
+  extension(LibraryFunc func)
+  {
+    public (int min, int max) ArgCounts => func switch
+    {
+      LibraryFunc.Last => (0, 0),
+      LibraryFunc.Position => (0, 0),
+      LibraryFunc.Count => (1, 1),
+      LibraryFunc.Id => (1, 1),
+      LibraryFunc.LocalName => (0, 1),
+      LibraryFunc.NamespaceUri => (0, 1),
+      LibraryFunc.Name => (0, 1),
+      LibraryFunc.String => (0, 1),
+      LibraryFunc.Concat => (2, int.MaxValue),
+      LibraryFunc.StartsWith => (2, 2),
+      LibraryFunc.Contains => (2, 2),
+      LibraryFunc.SubstringBefore => (2, 2),
+      LibraryFunc.SubstringAfter => (2, 2),
+      LibraryFunc.Substring => (2, 3),
+      LibraryFunc.StringLength => (0, 1),
+      LibraryFunc.NormalizeSpace => (0, 1),
+      LibraryFunc.Translate => (3, 3),
+      LibraryFunc.Boolean => (1, 1),
+      LibraryFunc.Not => (1, 1),
+      LibraryFunc.True => (0, 0),
+      LibraryFunc.False => (0, 0),
+      LibraryFunc.Lang => (1, 1),
+      LibraryFunc.Number => (0, 1),
+      LibraryFunc.Sum => (1, 1),
+      LibraryFunc.Floor => (1, 1),
+      LibraryFunc.Ceiling => (1, 1),
+      LibraryFunc.Round => (1, 1),
+      _ => throw new InvalidOperationException($"{func}")
+    };
+  }
 }

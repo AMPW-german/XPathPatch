@@ -45,6 +45,17 @@ public partial class XPathTests
           new(AstType.Value, "1"))),
       new(AstType.Axis, "@",
         new(AstType.NodeTest, "*")))],
+    ["A/B[sum(C/@V)=15]", new TestAst(AstType.Sep, "/",
+      new(AstType.NodeTest, "A"),
+      new(AstType.PathFilter, "[",
+        new(AstType.NodeTest, "B"),
+        new(AstType.CompareOp, "=",
+          new(AstType.FuncCall, "sum",
+            new(AstType.Sep, "/",
+              new(AstType.NodeTest, "C"),
+              new(AstType.Axis, "@",
+                new(AstType.NodeTest, "V")))),
+          new(AstType.Value, "15"))))]
   ];
 
   public record class TestAst(AstType Type, string Token, TestAst Left = null, TestAst Right = null)
@@ -80,7 +91,7 @@ public partial class XPathTests
   {
     var nodes = Parser.Parse(source).ToArray();
     var t = new TreeComparer(source);
-    TestAst.Equals(t, source, expected, nodes, nodes.Length-1);
+    TestAst.Equals(t, source, expected, nodes, nodes.Length - 1);
     t.Assert();
   }
 }
