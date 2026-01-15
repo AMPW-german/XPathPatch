@@ -182,80 +182,80 @@ public abstract class BaseTest
       res = res.Concat(r);
     return res;
   }
+}
 
-  public class TreeComparer(string title)
+public class TreeComparer(string title)
+{
+  public static TreeComparer New(string title) => new(title);
+
+  private readonly StringBuilder sb = new(title + "\n");
+  private string indent = "";
+  private bool child = false;
+  private bool match = true;
+
+  public TreeComparer Add(string info)
   {
-    public static TreeComparer New(string title) => new(title);
+    sb.Append(indent).AppendLine(info);
+    return this;
+  }
 
-    private readonly StringBuilder sb = new(title + "\n");
-    private string indent = "";
-    private bool child = false;
-    private bool match = true;
-
-    public TreeComparer Add(string info)
+  public TreeComparer Child(
+    string name, Action<TreeComparer> f, bool omitMatch = false)
+  {
+    var startLen = sb.Length;
+    Add(name);
+    var pindent = indent;
+    var pchild = child;
+    var pmatch = match;
+    match = true;
+    indent += "  ";
+    child = true;
+    try
     {
-      sb.Append(indent).AppendLine(info);
-      return this;
+      f(this);
     }
-
-    public TreeComparer Child(
-      string name, Action<TreeComparer> f, bool omitMatch = false)
-    {
-      var startLen = sb.Length;
-      Add(name);
-      var pindent = indent;
-      var pchild = child;
-      var pmatch = match;
-      match = true;
-      indent += "  ";
-      child = true;
-      try
-      {
-        f(this);
-      }
-      catch (AssertFailedException)
-      {
-        match = false;
-      }
-      indent = pindent;
-      child = pchild;
-      if (omitMatch && match)
-        sb.Length = startLen;
-      match = match && pmatch;
-      return this;
-    }
-
-    public TreeComparer Compare(string name, bool match, string expected, string actual)
-    {
-      this.match &= match;
-      return match
-        ? Add($"{name} = {expected}")
-        : Add(name).Add($"  < {expected}").Add($"  > {actual}");
-    }
-
-    public TreeComparer Compare<T>(string name, bool match, T expected, T actual) =>
-      Compare(name, match, $"{expected}", $"{actual}");
-
-    public TreeComparer CmpThrow(string name, bool match, string expected, string actual)
-    {
-      Compare(name, match, expected, actual);
-      if (!match) throw new AssertFailedException();
-      return this;
-    }
-
-    public TreeComparer CmpThrow<T>(string name, bool match, T expected, T actual) =>
-      CmpThrow(name, match, $"{expected}", $"{actual}");
-
-    public TreeComparer Fail()
+    catch (AssertFailedException)
     {
       match = false;
-      return this;
     }
+    indent = pindent;
+    child = pchild;
+    if (omitMatch && match)
+      sb.Length = startLen;
+    match = match && pmatch;
+    return this;
+  }
 
-    public void Assert()
-    {
-      if (!match)
-        throw new InvalidOperationException($"\n{sb}");
-    }
+  public TreeComparer Compare(string name, bool match, string expected, string actual)
+  {
+    this.match &= match;
+    return match
+      ? Add($"{name} = {expected}")
+      : Add(name).Add($"  < {expected}").Add($"  > {actual}");
+  }
+
+  public TreeComparer Compare<T>(string name, bool match, T expected, T actual) =>
+    Compare(name, match, $"{expected}", $"{actual}");
+
+  public TreeComparer CmpThrow(string name, bool match, string expected, string actual)
+  {
+    Compare(name, match, expected, actual);
+    if (!match) throw new AssertFailedException($"\n{sb}");
+    return this;
+  }
+
+  public TreeComparer CmpThrow<T>(string name, bool match, T expected, T actual) =>
+    CmpThrow(name, match, $"{expected}", $"{actual}");
+
+  public TreeComparer Fail()
+  {
+    match = false;
+    return this;
+  }
+
+  public void Assert()
+  {
+    if (!match)
+      throw new InvalidOperationException($"\n{sb}");
   }
 }

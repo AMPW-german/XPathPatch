@@ -353,7 +353,7 @@ public ref struct Compiler
           AstType.Root => StateFlags.IsNorm,
           AstType.Sep => StateFlags.IsNorm,
           AstType.Axis when compiler.ParseAxisType(node.Token) is AxisType axis =>
-            FlagOrdered(axis.IsForward) | FlagDeduped(!axis.CanDupe && !lastFlags.HasFlag(StateFlags.IsDeduped)),
+            FlagOrdered(axis.IsForward) | FlagDeduped(!axis.CanDupe && lastFlags.HasFlag(StateFlags.IsDeduped)),
           AstType.NodeTest => lastFlags,
           AstType.ProcType => lastFlags,
           AstType.PathFilter => lastFlags,

@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation="XPath.xsd">
+  <Entry Expr="A/B/*">
+    <Tokenize>
+      <Tok T="NtName" V="A" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="NtName" V="B" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="NtAny" V="*" />
+    </Tokenize>
+    <Parse T="Sep" V="/">
+      <L T="Sep" V="/">
+        <L T="NodeTest" V="A" />
+        <R T="NodeTest" V="B" />
+      </L>
+      <R T="NodeTest" V="*" />
+    </Parse>
+    <Compile T="Path">
+      <Path T="Context" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="A" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="B" />
+      <Path T="Axis" Ax="Child" />
+    </Compile>
+  </Entry>
+  <Entry Expr="(A/B)[1]/@*">
+    <Tokenize>
+      <Tok T="POpen" V="(" />
+      <Tok T="NtName" V="A" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="NtName" V="B" />
+      <Tok T="PClose" V=")" />
+      <Tok T="BOpen" V="[" />
+      <Tok T="Number" V="1" />
+      <Tok T="BClose" V="]" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="Attr" V="@" />
+      <Tok T="NtAny" V="*" />
+    </Tokenize>
+    <Parse T="Sep" V="/">
+      <L T="ExprFilter" V="[">
+        <L T="Sep" V="/">
+          <L T="NodeTest" V="A" />
+          <R T="NodeTest" V="B" />
+        </L>
+        <R T="Value" V="1" />
+      </L>
+      <R T="Axis" V="@">
+        <L T="NodeTest" V="*" />
+      </R>
+    </Parse>
+    <Compile T="Path">
+      <Path T="Expr">
+        <Expr T="Path">
+          <Path T="Context" />
+          <Path T="Axis" Ax="Child" />
+          <Path T="NameTest" Ns="" N="A" />
+          <Path T="Axis" Ax="Child" />
+          <Path T="NameTest" Ns="" N="B" />
+        </Expr>
+      </Path>
+      <Path T="Filter">
+        <Expr T="Number" Num="1" />
+      </Path>
+      <Path T="Axis" Ax="Attribute" />
+    </Compile>
+  </Entry>
+  <Entry Expr="(A/B)[@*][1]">
+    <Tokenize>
+      <Tok T="POpen" V="(" />
+      <Tok T="NtName" V="A" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="NtName" V="B" />
+      <Tok T="PClose" V=")" />
+      <Tok T="BOpen" V="[" />
+      <Tok T="Attr" V="@" />
+      <Tok T="NtAny" V="*" />
+      <Tok T="BClose" V="]" />
+      <Tok T="BOpen" V="[" />
+      <Tok T="Number" V="1" />
+      <Tok T="BClose" V="]" />
+    </Tokenize>
+    <Parse T="ExprFilter" V="[">
+      <L T="ExprFilter" V="[">
+        <L T="Sep" V="/">
+          <L T="NodeTest" V="A" />
+          <R T="NodeTest" V="B" />
+        </L>
+        <R T="Axis" V="@">
+          <L T="NodeTest" V="*" />
+        </R>
+      </L>
+      <R T="Value" V="1" />
+    </Parse>
+    <Compile T="Path">
+      <Path T="Expr">
+        <Expr T="Path">
+          <Path T="Expr">
+            <Expr T="Path">
+              <Path T="Context" />
+              <Path T="Axis" Ax="Child" />
+              <Path T="NameTest" Ns="" N="A" />
+              <Path T="Axis" Ax="Child" />
+              <Path T="NameTest" Ns="" N="B" />
+            </Expr>
+          </Path>
+          <Path T="Filter">
+            <Expr T="Path">
+              <Path T="Context" />
+              <Path T="Axis" Ax="Attribute" />
+            </Expr>
+          </Path>
+        </Expr>
+      </Path>
+      <Path T="Filter">
+        <Expr T="Number" Num="1" />
+      </Path>
+    </Compile>
+  </Entry>
+  <Entry Expr="A/B[1]/@*">
+    <Tokenize>
+      <Tok T="NtName" V="A" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="NtName" V="B" />
+      <Tok T="BOpen" V="[" />
+      <Tok T="Number" V="1" />
+      <Tok T="BClose" V="]" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="Attr" V="@" />
+      <Tok T="NtAny" V="*" />
+    </Tokenize>
+    <Parse T="Sep" V="/">
+      <L T="Sep" V="/">
+        <L T="NodeTest" V="A" />
+        <R T="PathFilter" V="[">
+          <L T="NodeTest" V="B" />
+          <R T="Value" V="1" />
+        </R>
+      </L>
+      <R T="Axis" V="@">
+        <L T="NodeTest" V="*" />
+      </R>
+    </Parse>
+    <Compile T="Path">
+      <Path T="Context" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="A" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="B" />
+      <Path T="Filter">
+        <Expr T="Number" Num="1" />
+      </Path>
+      <Path T="Axis" Ax="Attribute" />
+    </Compile>
+  </Entry>
+  <Entry Expr="A/child::B[1]/@*">
+    <Tokenize>
+      <Tok T="NtName" V="A" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="AxisName" V="child" />
+      <Tok T="Axis" V="::" />
+      <Tok T="NtName" V="B" />
+      <Tok T="BOpen" V="[" />
+      <Tok T="Number" V="1" />
+      <Tok T="BClose" V="]" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="Attr" V="@" />
+      <Tok T="NtAny" V="*" />
+    </Tokenize>
+    <Parse T="Sep" V="/">
+      <L T="Sep" V="/">
+        <L T="NodeTest" V="A" />
+        <R T="PathFilter" V="[">
+          <L T="Axis" V="child">
+            <L T="NodeTest" V="B" />
+          </L>
+          <R T="Value" V="1" />
+        </R>
+      </L>
+      <R T="Axis" V="@">
+        <L T="NodeTest" V="*" />
+      </R>
+    </Parse>
+    <Compile T="Path">
+      <Path T="Context" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="A" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="B" />
+      <Path T="Filter">
+        <Expr T="Number" Num="1" />
+      </Path>
+      <Path T="Axis" Ax="Attribute" />
+    </Compile>
+  </Entry>
+  <Entry Expr="A/B[sum(C/@V)=15]">
+    <Tokenize>
+      <Tok T="NtName" V="A" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="NtName" V="B" />
+      <Tok T="BOpen" V="[" />
+      <Tok T="FuncName" V="sum" />
+      <Tok T="POpen" V="(" />
+      <Tok T="NtName" V="C" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="Attr" V="@" />
+      <Tok T="NtName" V="V" />
+      <Tok T="PClose" V=")" />
+      <Tok T="OpEq" V="=" />
+      <Tok T="Number" V="15" />
+      <Tok T="BClose" V="]" />
+    </Tokenize>
+    <Parse T="Sep" V="/">
+      <L T="NodeTest" V="A" />
+      <R T="PathFilter" V="[">
+        <L T="NodeTest" V="B" />
+        <R T="CompareOp" V="=">
+          <L T="FuncCall" V="sum">
+            <L T="Sep" V="/">
+              <L T="NodeTest" V="C" />
+              <R T="Axis" V="@">
+                <L T="NodeTest" V="V" />
+              </R>
+            </L>
+          </L>
+          <R T="Value" V="15" />
+        </R>
+      </R>
+    </Parse>
+    <Compile T="Path">
+      <Path T="Context" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="A" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="B" />
+      <Path T="Filter">
+        <Expr T="Eq">
+          <L T="Func">
+            <Arg T="Path">
+              <Path T="Context" />
+              <Path T="Axis" Ax="Child" />
+              <Path T="NameTest" Ns="" N="C" />
+              <Path T="Axis" Ax="Attribute" />
+              <Path T="NameTest" Ns="" N="V" />
+            </Arg>
+          </L>
+          <R T="Number" Num="15" />
+        </Expr>
+      </Path>
+    </Compile>
+  </Entry>
+</TestData>

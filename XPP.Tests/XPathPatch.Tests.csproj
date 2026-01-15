@@ -12,6 +12,10 @@
     <ProjectReference Include="../XPathPatch.csproj" />
 
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+
+    <Content Include="TestData/*.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
