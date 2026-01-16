@@ -5,16 +5,25 @@ using System.Collections.Generic;
 
 namespace XPP.Utils;
 
-public class AppendList<T> : IEnumerable<T> where T : notnull
+public class AppendList<T> : IEnumerable<T>, IDisposable where T : notnull
 {
-  private const int CHUNK_SHIFT = 10;
-  private const int CHUNK_SIZE = 1 << CHUNK_SHIFT;
-  private const int CHUNK_MASK = CHUNK_SIZE - 1;
+  protected const int CHUNK_SHIFT = 10;
+  protected const int CHUNK_SIZE = 1 << CHUNK_SHIFT;
+  protected const int CHUNK_MASK = CHUNK_SIZE - 1;
 
-  private readonly List<T[]> chunks = [];
-  private int length = 0;
+  protected readonly List<T[]> chunks = [];
+  protected int length = 0;
 
-  public int Length => length;
+  public int Length
+  {
+    get => length;
+    set
+    {
+      if (value < 0 || value > length)
+        throw new IndexOutOfRangeException($"{value}");
+      length = value;
+    }
+  }
 
   public ref T this[int index]
   {
@@ -53,22 +62,24 @@ public class AppendList<T> : IEnumerable<T> where T : notnull
     return start..length;
   }
 
-  private ref T Ref(int index)
+  protected ref T Ref(int index)
   {
     var (chunk, offset) = IndexToChunkOffset(index);
     if (chunk == chunks.Count)
-      chunks.Add(new T[CHUNK_SIZE]);
+      chunks.Add(NewChunk());
     return ref chunks[chunk][offset];
   }
 
-  private static (int, int) IndexToChunkOffset(int index)
-  {
-    return (index >> CHUNK_SHIFT, index & CHUNK_MASK);
-  }
+  protected virtual T[] NewChunk() => new T[CHUNK_SIZE];
+
+  protected static (int, int) IndexToChunkOffset(int index) =>
+    (index >> CHUNK_SHIFT, index & CHUNK_MASK);
 
   public Enumerator GetEnumerator() => new(this);
   IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();
   IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+  public virtual void Dispose() { }
 
   public struct Enumerator(AppendList<T> list) : IEnumerator<T>, IEnumerator
   {
@@ -97,5 +108,35 @@ public class AppendList<T> : IEnumerable<T> where T : notnull
     public int Offset => range.off;
     public int Length => range.len;
     public ref T this[Index index] => ref list[range.off + index.GetOffset(range.len)];
+  }
+}
+
+public class PooledAppendList<T>() : AppendList<T> where T : notnull
+{
+  [ThreadStatic]
+  private static Queue<WeakReference<T[]>> Pool;
+
+  private readonly Queue<WeakReference<T[]>> pool = Pool ??= new();
+
+  public override void Dispose()
+  {
+    foreach (var chunk in chunks)
+    {
+      Array.Fill(chunk, default);
+      pool.Enqueue(new(chunk));
+    }
+    chunks.Clear();
+    length = 0;
+  }
+
+  protected override T[] NewChunk()
+  {
+    while (pool.Count > 0)
+    {
+      var cref = pool.Dequeue();
+      if (cref.TryGetTarget(out var chunk))
+        return chunk;
+    }
+    return new T[CHUNK_SIZE];
   }
 }
