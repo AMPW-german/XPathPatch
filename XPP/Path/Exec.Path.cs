@@ -21,12 +21,10 @@ public ref partial struct Exec
   {
     public XPNavigator Base;
 
-    public bool Up;
     public int Depth;
-
-    public bool FirstEnd;
-    public bool SecondEnd;
+    public AxPreState PState;
   }
+  private enum AxPreState { PrevSib, LastChild, Parent }
 
   private struct PathBuffers
   {

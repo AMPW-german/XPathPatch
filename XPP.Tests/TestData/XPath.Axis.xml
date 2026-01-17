@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation="XPath.Exec.xsd">
+  <Entry>
+    <A ancestor="2" ancestor-or-self="3">
+      <B preceding="11">
+        <C preceding="10">
+          <D preceding="9">
+            <E preceding="8" />
+          </D>
+        </C>
+      </B>
+      <B preceding="7">
+        <C preceding="6">
+          <D preceding="5">
+            <E preceding="4" />
+          </D>
+        </C>
+      </B>
+      <B ancestor="1" ancestor-or-self="2" parent="1">
+        <C preceding="3" preceding-sibling="1">
+          <D preceding="2">
+            <E preceding="1" />
+          </D>
+        </C>
+        <C ancestor-or-self="1" descendant-or-self="1" self="1"
+          X="1" Y="2" Z="3"
+          xmlns:L="1" xmlns:M="2">
+          <D child="1" descendant="1" descendant-or-self="2">
+            <E descendant="2"  descendant-or-self="3" />
+          </D>
+        </C>
+        <C following="1" following-sibling="1">
+          <D following="2">
+            <E following="3" />
+          </D>
+        </C>
+      </B>
+      <B following="4">
+        <C following="5">
+          <D following="6">
+            <E following="7" />
+          </D>
+        </C>
+      </B>
+      <B following="8">
+        <C following="9">
+          <D following="10">
+            <E following="11" />
+          </D>
+        </C>
+      </B>
+    </A>
+    <!-- ensure we are getting the starting node right -->
+    <Test Path="A/B[3]/C[2]">
+      <Match Path="A/B#2/C#1" />
+    </Test>
+    <!-- test each axis to sure we are returning the right nodes -->
+    <Test Path="A/B[3]/C[2]/ancestor::*">
+      <Match Path="" />
+      <Match Path="A" />
+      <Match Path="A/B#2" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/ancestor-or-self::*">
+      <Match Path="" />
+      <Match Path="A" />
+      <Match Path="A/B#2" />
+      <Match Path="A/B#2/C#1" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/attribute::*">
+      <Match Path="A/B#2/C#1/@ancestor-or-self" />
+      <Match Path="A/B#2/C#1/@descendant-or-self" />
+      <Match Path="A/B#2/C#1/@self" />
+      <Match Path="A/B#2/C#1/@X" />
+      <Match Path="A/B#2/C#1/@Y" />
+      <Match Path="A/B#2/C#1/@Z" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/child::*">
+      <Match Path="A/B#2/C#1/D" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/descendant::*">
+      <Match Path="A/B#2/C#1/D" />
+      <Match Path="A/B#2/C#1/D/E" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/descendant-or-self::*">
+      <Match Path="A/B#2/C#1" />
+      <Match Path="A/B#2/C#1/D" />
+      <Match Path="A/B#2/C#1/D/E" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/following::*">
+      <Match Path="A/B#2/C#2" />
+      <Match Path="A/B#2/C#2/D" />
+      <Match Path="A/B#2/C#2/D/E" />
+      <Match Path="A/B#3" />
+      <Match Path="A/B#3/C" />
+      <Match Path="A/B#3/C/D" />
+      <Match Path="A/B#3/C/D/E" />
+      <Match Path="A/B#4" />
+      <Match Path="A/B#4/C" />
+      <Match Path="A/B#4/C/D" />
+      <Match Path="A/B#4/C/D/E" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/following-sibling::*">
+      <Match Path="A/B#2/C#2" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/namespace::*">
+      <Match Path="A/B#2/C#1/:L" />
+      <Match Path="A/B#2/C#1/:M" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/parent::*">
+      <Match Path="A/B#2" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/preceding::*">
+      <Match Path="A/B#0" />
+      <Match Path="A/B#0/C" />
+      <Match Path="A/B#0/C/D" />
+      <Match Path="A/B#0/C/D/E" />
+      <Match Path="A/B#1" />
+      <Match Path="A/B#1/C" />
+      <Match Path="A/B#1/C/D" />
+      <Match Path="A/B#1/C/D/E" />
+      <Match Path="A/B#2/C#0" />
+      <Match Path="A/B#2/C#0/D" />
+      <Match Path="A/B#2/C#0/D/E" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/preceding-sibling::*">
+      <Match Path="A/B#2/C#0" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/self::*">
+      <Match Path="A/B#2/C#1" />
+    </Test>
+    <!-- test each axis again with position filter -->
+    <Test Path="A/B[3]/C[2]/ancestor::*[position()=@ancestor]">
+      <Match Path="A" />
+      <Match Path="A/B#2" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/ancestor-or-self::*[position()=@ancestor-or-self]">
+      <Match Path="A" />
+      <Match Path="A/B#2" />
+      <Match Path="A/B#2/C#1" />
+    </Test>
+    <!-- <Test Path="A/B[3]/C[2]/attribute::*[position()=@attribute]">
+      <Match Path="A/B#2/C#1/@ancestor-or-self" />
+      <Match Path="A/B#2/C#1/@descendant-or-self" />
+      <Match Path="A/B#2/C#1/@self" />
+      <Match Path="A/B#2/C#1/@X" />
+      <Match Path="A/B#2/C#1/@Y" />
+      <Match Path="A/B#2/C#1/@Z" />
+    </Test> -->
+    <Test Path="A/B[3]/C[2]/child::*[position()=@child]">
+      <Match Path="A/B#2/C#1/D" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/descendant::*[position()=@descendant]">
+      <Match Path="A/B#2/C#1/D" />
+      <Match Path="A/B#2/C#1/D/E" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/descendant-or-self::*[position()=@descendant-or-self]">
+      <Match Path="A/B#2/C#1" />
+      <Match Path="A/B#2/C#1/D" />
+      <Match Path="A/B#2/C#1/D/E" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/following::*[position()=@following]">
+      <Match Path="A/B#2/C#2" />
+      <Match Path="A/B#2/C#2/D" />
+      <Match Path="A/B#2/C#2/D/E" />
+      <Match Path="A/B#3" />
+      <Match Path="A/B#3/C" />
+      <Match Path="A/B#3/C/D" />
+      <Match Path="A/B#3/C/D/E" />
+      <Match Path="A/B#4" />
+      <Match Path="A/B#4/C" />
+      <Match Path="A/B#4/C/D" />
+      <Match Path="A/B#4/C/D/E" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/following-sibling::*[position()=@following-sibling]">
+      <Match Path="A/B#2/C#2" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/namespace::*[position()=.]">
+      <Match Path="A/B#2/C#1/:L" />
+      <Match Path="A/B#2/C#1/:M" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/parent::*[position()=@parent]">
+      <Match Path="A/B#2" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/preceding::*[position()=@preceding]">
+      <Match Path="A/B#0" />
+      <Match Path="A/B#0/C" />
+      <Match Path="A/B#0/C/D" />
+      <Match Path="A/B#0/C/D/E" />
+      <Match Path="A/B#1" />
+      <Match Path="A/B#1/C" />
+      <Match Path="A/B#1/C/D" />
+      <Match Path="A/B#1/C/D/E" />
+      <Match Path="A/B#2/C#0" />
+      <Match Path="A/B#2/C#0/D" />
+      <Match Path="A/B#2/C#0/D/E" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/preceding-sibling::*[position()=@preceding-sibling]">
+      <Match Path="A/B#2/C#0" />
+    </Test>
+    <Test Path="A/B[3]/C[2]/self::*[position()=@self]">
+      <Match Path="A/B#2/C#1" />
+    </Test>
+  </Entry>
+</TestData>

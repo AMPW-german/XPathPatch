@@ -1,0 +1,1 @@
+dotnet test XPP.Tests --logger "html;LogFileName=Results.html" @args

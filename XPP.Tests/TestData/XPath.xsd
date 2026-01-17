@@ -220,6 +220,5 @@
     <xs:attribute name="Nt" type="NodeType" />
     <xs:attribute name="Ns" type="xs:string" />
     <xs:attribute name="N" type="xs:string" />
-    <xs:attribute name="Dedupe" type="xs:boolean" />
   </xs:complexType>
 </xs:schema>

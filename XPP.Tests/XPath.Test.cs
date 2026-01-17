@@ -92,6 +92,8 @@ public partial class XPathExecTest
 {
   [XmlAttribute("Path")] public string Path;
   [XmlElement("Match")] public List<XPathExecMatch> Matches = [];
+
+  public override string ToString() => Path;
 }
 
 public partial class XPathExecMatch

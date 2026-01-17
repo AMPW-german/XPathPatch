@@ -286,4 +286,22 @@
       <R T="Number" Num="1" />
     </Compile>
   </Entry>
+  <Entry Expr="A/B[3]/C[2]/preceding::*">
+    <Compile T="Path">
+      <Path T="Context" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="A" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="B" />
+      <Path T="Filter">
+        <Expr T="Number" Num="3" />
+      </Path>
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="C" />
+      <Path T="Filter" Rev="1">
+        <Expr T="Number" Num="2" />
+      </Path>
+      <Path T="Axis" Ax="Preceding" Fwd="0" Rev="1" Heap="1" Dd="1" />
+    </Compile>
+  </Entry>
 </TestData>

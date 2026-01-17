@@ -88,7 +88,8 @@ public abstract class BaseTest
     }
 
     public static implicit operator Path(string path) =>
-      [.. path.Split('/').Select(p => (PathStep)p)];
+      [.. path.Split('/', StringSplitOptions.RemoveEmptyEntries)
+              .Select(p => (PathStep)p)];
 
     public static Path FromNode(XPNodeRef node)
     {

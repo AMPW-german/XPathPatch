@@ -35,6 +35,7 @@ public partial class XPathTests
 
   [TestMethod]
   [DynamicData(nameof(LoadExecTests), ["XPath.Exec.xml"])]
+  [DynamicData(nameof(LoadExecTests), ["XPath.Axis.xml"])]
   public void TestExecNode(XmlElement srcDoc, XPathExecTest test, Exception ex = null)
   {
     if (ex != null)

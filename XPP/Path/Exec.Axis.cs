@@ -187,38 +187,66 @@ public ref partial struct Exec
   {
     public static bool Init(ref XPNavigator nav, out PathState state)
     {
-      state = new() { Base = nav, Up = true, Depth = 0 };
+      state = new() { Base = nav, Depth = 0, PState = AxPreState.PrevSib };
       return Next(ref nav, ref state);
     }
     public static bool Next(ref XPNavigator nav, ref PathState state)
     {
-      if (!state.Up && nav.LastChild(out var next))
-      {
-        nav = next;
-        state.Depth++;
-        return true;
-      }
-      state.Up = false;
       while (true)
       {
-        if (nav.PreviousSibling(out next))
-          return (nav = next).Node.Valid;
-        if (!nav.Parent(out next))
-          return false;
-        nav = next;
-        state.Up = true;
-        var skip = false;
-        if (state.Depth == 0)
+        switch (state.PState)
         {
-          if (!state.Base.Parent(out next))
-            throw  new InvalidOperationException();
-          state.Base = next;
-          skip = state.Base.CompareTo(nav) == 0;
+          case AxPreState.PrevSib:
+            {
+              if (nav.PreviousSibling(out var next))
+              {
+                // if we have a previous sibling, move to it and try its children first
+                nav = next;
+                state.PState = AxPreState.LastChild;
+                continue;
+              }
+              // otherwise go to parent and try again
+              state.PState = AxPreState.Parent;
+              continue;
+            }
+          case AxPreState.LastChild:
+            {
+              if (nav.LastChild(out var next))
+              {
+                // if we have a child, move to last and try its children
+                nav = next;
+                state.Depth++;
+                continue;
+              }
+              // otherwise return this node, and move to previous sibling next
+              state.PState = AxPreState.PrevSib;
+              return true;
+            }
+          case AxPreState.Parent:
+            {
+              // if we are at the root, we are done
+              if (!nav.Parent(out var next))
+                return false;
+              // otherwise its prev sibling will be next after possibly returning this
+              nav = next;
+              state.PState = AxPreState.PrevSib;
+              if (state.Depth == 0)
+              {
+                // if we are moving further upwards, move the base up
+                if (!state.Base.Parent(out next))
+                  throw new InvalidOperationException();
+                state.Base = next;
+                // if base matches, we are at an ancestor, so don't return it
+                if (state.Base.CompareTo(nav) == 0)
+                  continue;
+              }
+              else
+                state.Depth--;
+              return true;
+            }
+          default:
+            throw new InvalidOperationException($"{state.PState}");
         }
-        else
-          state.Depth--;
-        if (!skip)
-          return true;
       }
     }
   }
