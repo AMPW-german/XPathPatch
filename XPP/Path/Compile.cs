@@ -1,85 +1,68 @@
 
 using System;
-using System.Runtime.InteropServices;
 using XPP.Utils;
 
 namespace XPP.Path;
 
-public readonly struct PathOp(PathOpType type)
+public struct PathOp(PathOpType type)
 {
-  public readonly PathOpType Type = type;
-
-  private readonly int v0;
-  private readonly int v1;
-  private readonly int v2;
-  private readonly int v3;
+  public PathOpType Type = type;
+  public PathOpMode Mode;
+  // Mode Flags
+  public bool Forward;
+  public bool Dedupe;
+  public bool Reverse;
+  // Metadata
+  public int RootNum;
+  public int Length;
 
   // Union
-  public (int, int) Paths { get => (v0, v1); init => (v0, v1) = value; }
+  public int UnionL;
+  public int UnionR;
 
   // Axis
-  public AxisType Axis { get => (AxisType)v0; init => v0 = (int)value; }
+  public AxisType Axis;
 
   // NodeType
-  public NodeType NodeType { get => (NodeType)v0; init => v0 = (int)value; }
+  public NodeType NodeType;
 
   // NameTest
-  public Range Ns { get => v0..v1; init => (v0, v1) = (value.Start.Value, value.End.Value); }
-  public Range Name { get => v2..v3; init => (v2, v3) = (value.Start.Value, value.End.Value); }
+  public string Ns;
+  public string Name;
 
   // Filter/Expr
-  public int Expr { get => v0; init => v0 = value; }
-
-  // Normalize
-  public bool Dedupe { get => v0 != 0; init => v0 = value ? 1 : 0; }
+  public int Expr;
 }
 
-public readonly struct ValOp(ValOpType type, int left = -1, int right = -1)
+public struct ValOp(ValOpType type)
 {
-  public readonly ValOpType Type = type;
-  public readonly int Left = left;
-  public readonly int Right = right;
-  public readonly CompileValue Value;
+  public ValOpType Type = type;
 
-  public Range Args => Left..Right;
-  public Range Name => Value.String;
-  public LibraryFunc Func => (LibraryFunc)Value.NodeSet;
+  public int Left = -1;
+  public int Right = -1;
+
+  // Number
+  public double Number;
+  // String, Variable, UserFunc
+  public string String;
 
   // Func
-  public ValOp(ValOpType type, LibraryFunc func, Range args) : this(type, args.Start.Value, args.End.Value) =>
-    Value = new() { NodeSet = (int)func };
-  // UserFunc
-  public ValOp(ValOpType type, Range name, Range args) : this(type, args.Start.Value, args.End.Value) =>
-    Value = new() { String = name };
-  // Number, String, Variable (name in String)
-  public ValOp(ValOpType type, CompileValue value) : this(type) => Value = value;
-}
-
-[StructLayout(LayoutKind.Explicit)]
-public struct CompileValue
-{
-  [FieldOffset(0)]
-  public bool Bool;
-  [FieldOffset(0)]
-  public double Number;
-  [FieldOffset(0)]
-  public Range String;
-  [FieldOffset(0)]
-  public int NodeSet;
+  public LibraryFunc Func;
+  // Func and UserFunc
+  public Range Args;
 }
 
 public ref struct Compiler
 {
   public static void Compile(
     ReadOnlySpan<char> source, ReadOnlySpan<AstNode> nodes,
-    out ReadOnlySpan<PathOp> paths, out ReadOnlySpan<ValOp> vals, out ReadOnlySpan<char> data)
+    out ReadOnlySpan<PathOp> paths, out ReadOnlySpan<ValOp> vals)
   {
     var compiler = new Compiler(source, nodes);
     compiler.Compile();
 
     paths = compiler.paths.Span;
     vals = compiler.vals.Span;
-    data = compiler.data.Span;
   }
 
   // compile state of an AST node
@@ -87,24 +70,13 @@ public ref struct Compiler
   {
     public int PathStart = -1;
     public int PathIdx = -1;
-    public int PathPrev = -1;
-    public int PathNext = -1;
-    public StateFlags Flags = 0;
     public int ValIdx = -1;
-  }
-
-  [Flags]
-  private enum StateFlags
-  {
-    IsOrdered = 1,
-    IsDeduped = 2,
-    IsNorm = IsOrdered | IsDeduped,
+    public AxisType Axis;
   }
 
   private class CompileBuf<O, T>() : ThreadBuf<O, T>(XPath.MAX_LENGTH) where O : CompileBuf<O, T>, new();
   private class PathBuf : CompileBuf<PathBuf, PathOp>;
   private class ValBuf : CompileBuf<ValBuf, ValOp>;
-  private class DataBuf : CompileBuf<DataBuf, char>;
   private class StateBuf : CompileBuf<StateBuf, State>;
   private class QueueBuf : CompileBuf<QueueBuf, int>;
 
@@ -114,7 +86,6 @@ public ref struct Compiler
   // result output bufs
   private SpanBuf<PathOp> paths;
   private SpanBuf<ValOp> vals;
-  private SpanBuf<char> data;
 
   // compile states by node
   private readonly Span<State> states;
@@ -129,7 +100,6 @@ public ref struct Compiler
 
     paths = PathBuf.Buf;
     vals = ValBuf.Buf;
-    data = DataBuf.Buf;
 
     states = StateBuf.Span;
     states[..nodes.Length].Fill(new());
@@ -141,6 +111,14 @@ public ref struct Compiler
   {
     QueueExpr(nodes.Length - 1);
     DrainQueue();
+
+    var rootNum = -1;
+    for (var i = 0; i < paths.Length; i++)
+    {
+      if (paths[i].Type.IsRoot)
+        rootNum++;
+      paths[i].RootNum = rootNum;
+    }
   }
 
   private void DrainQueue()
@@ -169,12 +147,8 @@ public ref struct Compiler
   {
     states[index].PathStart = paths.Length;
 
-    var mark = new PathMarkPass();
     var compile = new PathCompilePass();
     var backfill = new PathBackfillPass();
-
-    WalkPath(index, ref mark);
-    mark.FinishMark(ref this);
 
     WalkPath(index, ref compile);
     if (!paths[^1].Type.IsRoot)
@@ -184,6 +158,49 @@ public ref struct Compiler
     }
     DrainQueue();
     WalkPath(index, ref backfill);
+
+    // after we have everything filled in, walk from the end and set mode and flags
+    index = states[index].PathStart;
+    var count = 1;
+    while (!paths[index + count - 1].Type.IsRoot) count++;
+
+    var lastDupe = false;
+    for (var i = index + count; --i >= index;)
+    {
+      ref var path = ref paths[i];
+      if (path.Type.IsRoot)
+      {
+        lastDupe = false;
+        path.Mode = PathOpMode.Linear;
+        path.Forward = true;
+        continue;
+      }
+      ref var nextPath = ref paths[i + 1];
+      if (path.Type is PathOpType.Axis)
+      {
+        if (lastDupe)
+          nextPath.Dedupe = true;
+        var axis = path.Axis;
+        path.Forward = axis.IsForward;
+        if (path.Forward != nextPath.Forward)
+          nextPath.Reverse = true;
+        lastDupe = axis.CanDupe;
+        path.Mode = axis.CanDupe ? PathOpMode.HeapExpand : PathOpMode.Linear;
+      }
+      else
+      {
+        path.Mode = PathOpMode.Linear;
+        path.Forward = nextPath.Forward;
+      }
+    }
+    if (lastDupe)
+      paths[index].Dedupe = true;
+    if (!paths[index].Forward)
+      paths[index].Reverse = true;
+
+    // finally reverse the order
+    paths[index..(index + count)].Reverse();
+    paths[index].Length = count;
   }
 
   private void QueuePath(int index) => queue.Add(~index);
@@ -243,10 +260,12 @@ public ref struct Compiler
         case AstType.Value:
           compiler.AddExpr(ref state, node.Token.Type switch
           {
-            TokenType.VarRef => new(ValOpType.Variable, compiler.AddDataVal(node.Token, 1, 0)),
-            TokenType.String => new(ValOpType.String, compiler.AddDataVal(node.Token, 1, 1)),
-            TokenType.Number => new(ValOpType.Number,
-              new CompileValue { Number = double.Parse(compiler.TokStr(node.Token)) }),
+            TokenType.VarRef =>
+              new(ValOpType.Variable) { String = new(compiler.TokStr(node.Token)[1..]) },
+            TokenType.String =>
+              new(ValOpType.String) { String = new(compiler.TokStr(node.Token)[1..^1]) },
+            TokenType.Number =>
+              new(ValOpType.Number) { Number = double.Parse(compiler.TokStr(node.Token)) },
             _ => throw new InvalidOperationException($"{node.Token.Type}"),
           });
           break;
@@ -261,9 +280,14 @@ public ref struct Compiler
               $"invalid argcount for {compiler.TokStr(node.Token)}: {argCount} <> [{minArgs},{maxArgs}]");
           var argRange = argStart..(argStart + argCount);
           if (func != LibraryFunc.Invalid)
-            compiler.AddExpr(ref state, new(ValOpType.Func, func, argRange));
+            compiler.AddExpr(ref state,
+              new(ValOpType.Func) { Func = func, Args = argRange });
           else
-            compiler.AddExpr(ref state, new(ValOpType.UserFunc, compiler.AddData(node.Token), argRange));
+            compiler.AddExpr(ref state, new(ValOpType.UserFunc)
+            {
+              String = new(compiler.TokStr(node.Token)),
+              Args = argRange,
+            });
           break;
         case AstType.ArgList: break;
         case AstType.BoolOp:
@@ -272,17 +296,17 @@ public ref struct Compiler
           compiler.ReserveExpr(idx);
           compiler.ReserveExpr(node.Child0);
           compiler.ReserveExpr(node.Child1);
-          compiler.AddExpr(ref state, new(
-            node.Token.Type.AsValOp,
-            compiler.ValOpIndex(node.Child0),
-            compiler.ValOpIndex(node.Child1)));
+          compiler.AddExpr(ref state, new(node.Token.Type.AsValOp)
+          {
+            Left = compiler.ValOpIndex(node.Child0),
+            Right = compiler.ValOpIndex(node.Child1),
+          });
           break;
         case AstType.Negate:
           compiler.ReserveExpr(idx);
           compiler.ReserveExpr(node.Child0);
-          compiler.AddExpr(ref state, new(
-            node.Token.Type.AsValOp,
-            compiler.ValOpIndex(node.Child0)));
+          compiler.AddExpr(ref state,
+            new(node.Token.Type.AsValOp) { Left = compiler.ValOpIndex(node.Child0) });
           break;
       }
     }
@@ -317,70 +341,12 @@ public ref struct Compiler
         case AstType.PathFilter:
         case AstType.ExprFilter:
         case AstType.Union:
-          compiler.AddExpr(ref state, new(ValOpType.Path, compiler.PathStart(idx)));
+          compiler.AddExpr(ref state,
+            new(ValOpType.Path) { Left = compiler.PathStart(idx) });
           break;
       }
     }
   }
-
-  // mark path next nodes and flags
-  private struct PathMarkPass() : ICompilerPass
-  {
-    private int last = -1;
-
-    public void Visit(ref Compiler compiler, int idx, ref readonly AstNode node, ref State state)
-    {
-      if (last != -1)
-      {
-        compiler.states[last].PathNext = idx;
-        state.PathPrev = last;
-      }
-      last = idx;
-    }
-
-    public void FinishMark(ref Compiler compiler)
-    {
-      var idx = last;
-      StateFlags lastFlags = StateFlags.IsNorm;
-      while (idx != -1)
-      {
-        ref readonly var node = ref compiler.nodes[idx];
-        ref var state = ref compiler.states[idx];
-
-        // set flags based on what the previous node will receive
-        state.Flags = node.Type switch
-        {
-          AstType.Root => StateFlags.IsNorm,
-          AstType.Sep => StateFlags.IsNorm,
-          AstType.Axis when compiler.ParseAxisType(node.Token) is AxisType axis =>
-            FlagOrdered(axis.IsForward) | FlagDeduped(!axis.CanDupe && lastFlags.HasFlag(StateFlags.IsDeduped)),
-          AstType.NodeTest => lastFlags,
-          AstType.ProcType => lastFlags,
-          AstType.PathFilter => lastFlags,
-          AstType.ExprFilter => StateFlags.IsNorm,
-          AstType.Union => StateFlags.IsNorm,
-          // user vars and funcs could give us anything
-          AstType.Value => 0,
-          AstType.FuncCall => 0,
-          _ => throw new InvalidOperationException($"{node.Type}"),
-        };
-
-        idx = state.PathPrev;
-        lastFlags = state.Flags;
-      }
-    }
-
-    private static StateFlags FlagOrdered(bool ordered) => ordered ? StateFlags.IsOrdered : 0;
-    private static StateFlags FlagDeduped(bool ordered) => ordered ? StateFlags.IsDeduped : 0;
-  }
-  private AxisType ParseAxisType(Token tok) => tok.Type switch
-  {
-    TokenType.AxisName => XPath.ParseAxisType(TokStr(tok)),
-    TokenType.Attr => AxisType.Attribute,
-    TokenType.Self => AxisType.Self,
-    TokenType.Parent => AxisType.Parent,
-    _ => throw new InvalidOperationException($"{tok.Type}"),
-  };
 
   // assign all path nodes and queue child expressions and paths
   private struct PathCompilePass() : ICompilerPass
@@ -395,19 +361,8 @@ public ref struct Compiler
       hasAxis = true;
     }
 
-    private void EnsureNorm(ref Compiler compiler, StateFlags nextFlags)
-    {
-      if (nextFlags == StateFlags.IsNorm)
-        return;
-      compiler.AddPath(new(PathOpType.Normalize) { Dedupe = !nextFlags.HasFlag(StateFlags.IsDeduped) });
-    }
-
     public void Visit(ref Compiler compiler, int idx, ref readonly AstNode node, ref State state)
     {
-      if (state.PathPrev == -1)
-        EnsureNorm(ref compiler, state.Flags);
-
-      var nextFlags = state.PathNext != -1 ? compiler.states[state.PathNext].Flags : StateFlags.IsNorm;
       switch (node.Type)
       {
         case AstType.Root:
@@ -420,7 +375,6 @@ public ref struct Compiler
           EnsureAxis(ref compiler);
           if (node.Token.Type == TokenType.OpSepDesc)
             compiler.AddPath(new(PathOpType.Axis) { Axis = AxisType.DescendantOrSelf });
-          EnsureNorm(ref compiler, nextFlags);
           hasAxis = false;
           break;
         case AstType.Axis:
@@ -442,13 +396,17 @@ public ref struct Compiler
           {
             case TokenType.NtAny: break;
             case TokenType.NtAnyNs:
-              compiler.AddPath(new(PathOpType.NameTest) { Ns = compiler.AddNs(node.Token), Name = 0..0 });
+              compiler.AddPath(new(PathOpType.NameTest)
+              {
+                Ns = new(compiler.TokNs(node.Token)),
+                Name = "",
+              });
               break;
             case TokenType.NtName:
               compiler.AddPath(new(PathOpType.NameTest)
               {
-                Ns = compiler.AddNs(node.Token),
-                Name = compiler.AddName(node.Token)
+                Ns = new(compiler.TokNs(node.Token)),
+                Name = new(compiler.TokName(node.Token)),
               });
               break;
             case TokenType.NodeType:
@@ -462,8 +420,10 @@ public ref struct Compiler
           hasAxis = false;
           break;
         case AstType.ProcType:
-          compiler.AddPath(new(PathOpType.NameTest) { Name = compiler.AddData(node.Token) });
-          compiler.AddPath(new(PathOpType.NodeType) { NodeType = NodeType.ProcessingInstruction });
+          compiler.AddPath(
+            new(PathOpType.NameTest) { Name = new(compiler.TokStr(node.Token)) });
+          compiler.AddPath(
+            new(PathOpType.NodeType) { NodeType = NodeType.ProcessingInstruction });
           hasAxis = false;
           break;
         case AstType.PathFilter:
@@ -514,7 +474,8 @@ public ref struct Compiler
         case AstType.Union:
           compiler.paths[state.PathIdx] = new(PathOpType.Union)
           {
-            Paths = (compiler.PathStart(node.Child0), compiler.PathStart(node.Child1))
+            UnionL = compiler.PathStart(node.Child0),
+            UnionR = compiler.PathStart(node.Child1),
           };
           break;
         case AstType.Value or AstType.FuncCall:
@@ -526,28 +487,20 @@ public ref struct Compiler
 
   private ReadOnlySpan<char> TokStr(Token tok) => source[tok.Data];
 
-  private Range AddData(Token tok) => data.AddRange(TokStr(tok));
-
-  private Range AddNs(Token tok)
+  private ReadOnlySpan<char> TokNs(Token tok)
   {
     var str = TokStr(tok);
     var idx = str.IndexOf(':');
     if (idx == -1)
-      return 0..0;
-    return data.AddRange(str[..idx]);
+      return "";
+    return str[..idx];
   }
 
-  private Range AddName(Token tok)
+  private ReadOnlySpan<char> TokName(Token tok)
   {
     var str = TokStr(tok);
     var idx = str.IndexOf(':');
-    return data.AddRange(str[(idx + 1)..]);
-  }
-
-  private CompileValue AddDataVal(Token tok, int strim, int etrim)
-  {
-    var str = TokStr(tok);
-    return new() { String = data.AddRange(str[strim..^etrim]) };
+    return str[(idx + 1)..];
   }
 
   private void WalkExpr<T>(int idx, ref T visitor) where T : struct, ICompilerPass, allows ref struct

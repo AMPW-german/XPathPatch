@@ -92,11 +92,18 @@ public enum PathOpType
   Root, // start from root
   Union, // start from union of [Paths]
   Expr, // start from expression output
+  // VarRef, // start from variable
   Axis, // walk axis from Parent
   NodeType, // filter nodes from Parent by NodeType
   NameTest, // filter nodes from Parent by [ns]:[name] (0:0 is *, 0:>0 is name, >0:>0 is ns:name, >0:0 is ns:*)
   Filter, // filter nodes from Parent by SubExpr
-  Normalize, // sort by document order and Dedupe?
+}
+
+public enum PathOpMode
+{
+  // FullNorm, // get full results, then sort and dedupe
+  Linear, // copy matching into next buffer
+  HeapExpand, // treat source buffer as heap. expand into next buffer from lowest
 }
 
 public enum ValOpType
@@ -316,6 +323,8 @@ public static partial class Extensions
       AxisType.Self => false,
       _ => throw new InvalidOperationException($"{axis}"),
     };
+
+    public bool IsSingle => axis is AxisType.Parent or AxisType.Self;
   }
 
   extension(PathOpType type)

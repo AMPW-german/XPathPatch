@@ -84,7 +84,7 @@ public class AppendList<T> : IEnumerable<T>, IDisposable where T : notnull
   public struct Enumerator(AppendList<T> list) : IEnumerator<T>, IEnumerator
   {
     private readonly AppendList<T> list = list;
-    private int index;
+    private int index = -1;
 
     public T Current => list[index];
     object IEnumerator.Current => Current;

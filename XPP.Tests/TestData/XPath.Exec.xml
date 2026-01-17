@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation="XPath.Exec.xsd">
+  <Entry>
+    <A>
+      <B>
+        <C />
+      </B>
+      <B>
+        <C />
+      </B>
+    </A>
+    <Test Path="A/B/C">
+      <Match Path="A/B#0/C" />
+      <Match Path="A/B#1/C" />
+    </Test>
+    <Test Path="A/B/C[1]">
+      <Match Path="A/B#0/C" />
+      <Match Path="A/B#1/C" />
+    </Test>
+    <Test Path="(A/B/C)[1]">
+      <Match Path="A/B#0/C" />
+    </Test>
+    <Test Path="//*[local-name()='B']">
+      <Match Path="A/B#0" />
+      <Match Path="A/B#1" />
+    </Test>
+  </Entry>
+  <Entry>
+    <A>
+      <B>
+        <C V="1" />
+        <C V="2" />
+        <C V="3" />
+      </B>
+      <B>
+        <C V="4" />
+        <C V="5" />
+        <C V="6" />
+      </B>
+    </A>
+    <Test Path="A/B[sum(C/@V)=6]">
+      <Match Path="A/B#0" />
+    </Test>
+    <Test Path="A/B[sum(C/@V)=15]">
+      <Match Path="A/B#1" />
+    </Test>
+  </Entry>
+</TestData>

@@ -69,6 +69,8 @@ public partial class PatchTests
       t.Compare("Type", expected.Type == action.Type, expected.Type, action.Type);
       if (expected.Target != null && Path.FromNode(actual.Target) is Path atgt)
         t.Compare("Target", expected.Target.Equals(atgt), expected.Target, atgt);
+      else
+        t.Add($"Target = {Path.FromNode(actual.Target)}");
       if (expected.Source != null && Path.FromNode(actual.Source) is Path asrc)
         t.Compare("Source", expected.Source.Equals(asrc), expected.Source, asrc);
       if (expected.Pos != null)
@@ -86,7 +88,7 @@ public partial class PatchTests
       while (index < echildren.Length || achild.Valid)
       {
         var echild = index < echildren.Length ? echildren[index] : null;
-        t.Child($"Child {index}", t => Equals(t, echild, achild), true);
+        t.Child($"Child {index}", t => Equals(t, echild, achild), false);
 
         index++;
         achild = achild.NextSibling;

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Xml;
 using System.Xml.Serialization;
 using XPP.Path;
 
@@ -52,6 +53,16 @@ public partial class XPathCExpr
 public partial class XPathCPath
 {
   [XmlAttribute("T")] public PathOpType Type;
+  [XmlIgnore] public PathOpMode Mode = PathOpMode.Linear;
+  [XmlAttribute("Heap")]
+  public bool _Heap
+  {
+    get => Mode == PathOpMode.HeapExpand;
+    set => Mode = value ? PathOpMode.HeapExpand : PathOpMode.Linear;
+  }
+  [XmlAttribute("Fwd")] public bool Forward = true;
+  [XmlAttribute("Dd")] public bool Dedupe;
+  [XmlAttribute("Rev")] public bool Reverse;
   [XmlArray("UL")]
   [XmlArrayItem("Path")]
   public List<XPathCPath> UnionL;
@@ -69,8 +80,23 @@ public partial class XPathCPath
   [XmlAttribute("Ns")] public string Ns;
   [XmlAttribute("N")] public string Name;
   [XmlElement("Expr")] public XPathCExpr Expr;
-  [XmlAttribute("Dedupe")]
-  public bool _Dedupe
-  { get => Dedupe ?? default; set => Dedupe = value; }
-  [XmlIgnore] public bool? Dedupe;
+}
+
+public partial class XPathExecEntry
+{
+  [XmlAnyElement] public XmlElement Doc;
+  [XmlElement("Test")] public List<XPathExecTest> Tests = [];
+}
+
+public partial class XPathExecTest
+{
+  [XmlAttribute("Path")] public string Path;
+  [XmlElement("Match")] public List<XPathExecMatch> Matches = [];
+}
+
+public partial class XPathExecMatch
+{
+  [XmlAttribute("Path")] public string Path;
+
+  public static implicit operator BaseTest.Path(XPathExecMatch match) => match.Path;
 }

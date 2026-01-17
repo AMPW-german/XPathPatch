@@ -2,6 +2,7 @@
 using System;
 using System.Globalization;
 using XPP.Doc;
+using XPP.Utils;
 
 namespace XPP.Path;
 
@@ -24,17 +25,17 @@ public ref partial struct Exec
       new(XPValueType.NodeSet) { NodeSet = index };
   }
 
-  private Value GetValue(int idx, XPNavigator ctx)
+  private Value GetValue(int idx, PathContext ctx)
   {
     ref readonly var op = ref path.Vals[idx];
     switch (op.Type)
     {
-      case ValOpType.Number: return new(op.Value.Number);
-      case ValOpType.String: return new(CompiledString(op.Value.String));
+      case ValOpType.Number: return new(op.Number);
+      case ValOpType.String: return new(op.String);
       case ValOpType.Variable:
         throw new NotImplementedException();
       case ValOpType.Path:
-        ResetPath(op.Left, ctx);
+        ExecPath(op.Left, ctx.Nav);
         return Value.MakeNodeSet(op.Left);
       case ValOpType.Negate:
         return new(-NumberValue(GetValue(op.Left, ctx)));
@@ -52,7 +53,7 @@ public ref partial struct Exec
     }
   }
 
-  private Value BoolOp(int idx, XPNavigator ctx)
+  private Value BoolOp(int idx, PathContext ctx)
   {
     ref readonly var op = ref path.Vals[idx];
     var left = BoolValue(GetValue(op.Left, ctx));
@@ -65,7 +66,7 @@ public ref partial struct Exec
     });
   }
 
-  private Value CompareOp(int idx, XPNavigator ctx)
+  private Value CompareOp(int idx, PathContext ctx)
   {
     ref readonly var op = ref path.Vals[idx];
     var left = GetValue(op.Left, ctx);
@@ -130,11 +131,11 @@ public ref partial struct Exec
   private bool NodeSetsEqual(int lidx, int ridx, bool expected)
   {
     var lstart = stringBuf.Length;
-    while (NextNode(lidx, out var nav))
-      stringBuf.Add(new(NodeStringValue(nav)));
+    foreach (var node in PathResult(lidx))
+      stringBuf.Add(new(NodeStringValue(node.Nav)));
     var rstart = stringBuf.Length;
-    while (NextNode(ridx, out var nav))
-      stringBuf.Add(new(NodeStringValue(nav)));
+    foreach (var node in PathResult(ridx))
+      stringBuf.Add(new(NodeStringValue(node.Nav)));
     var end = stringBuf.Length;
 
     var lstrs = stringBuf[lstart..rstart];
@@ -163,18 +164,21 @@ public ref partial struct Exec
   {
     var less = minCmp < 0;
 
-    if (!NextNode(lidx, out var nav))
+    var lnodes = PathResult(lidx);
+    var rnodes = PathResult(lidx);
+
+    if (lnodes.Length == 0 || rnodes.Length == 0)
       return false;
-    var lbound = NodeNumberValue(nav);
-    while (NextNode(lidx, out nav))
+
+    var lbound = NodeNumberValue(lnodes[0].Nav);
+    foreach (var node in lnodes[1..])
     {
-      var val = NodeNumberValue(nav);
+      var val = NodeNumberValue(node.Nav);
       lbound = less ? Math.Min(lbound, val) : Math.Max(lbound, val);
     }
-
-    while (NextNode(ridx, out nav))
+    foreach (var node in rnodes)
     {
-      var cmp = lbound.CompareTo(NodeNumberValue(nav));
+      var cmp = lbound.CompareTo(NodeNumberValue(node.Nav));
       if (cmp >= minCmp && cmp <= maxCmp)
         return true;
     }
@@ -183,9 +187,9 @@ public ref partial struct Exec
 
   private bool NodeSetValEqual(int nodes, Value val, bool expected)
   {
-    while (NextNode(nodes, out var nav))
+    foreach (var node in PathResult(nodes))
     {
-      if (ValsEqual(new(NodeStringValue(nav)), val) == expected)
+      if (ValsEqual(new(NodeStringValue(node.Nav)), val) == expected)
         return true;
     }
     return false;
@@ -194,9 +198,9 @@ public ref partial struct Exec
   private bool NodeSetValCompare(int nodes, Value val, int minCmp, int maxCmp)
   {
     var right = NumberValue(val);
-    while (NextNode(nodes, out var nav))
+    foreach (var node in PathResult(nodes))
     {
-      var left = NodeNumberValue(nav);
+      var left = NodeNumberValue(node.Nav);
       var cmp = left.CompareTo(right);
       if (cmp >= minCmp && cmp <= maxCmp)
         return true;
@@ -219,7 +223,7 @@ public ref partial struct Exec
   private int ValsCompare(Value left, Value right) =>
     NumberValue(left).CompareTo(NumberValue(right));
 
-  private Value MathOp(int idx, XPNavigator ctx)
+  private Value MathOp(int idx, PathContext ctx)
   {
     ref readonly var op = ref path.Vals[idx];
     var left = NumberValue(GetValue(op.Left, ctx));
@@ -240,7 +244,7 @@ public ref partial struct Exec
     XPValueType.Bool => val.Bool,
     XPValueType.Number => val.Number != 0 && !double.IsNaN(val.Number),
     XPValueType.String => val.String.Length > 0,
-    XPValueType.NodeSet => NextNode(val.NodeSet, out _),
+    XPValueType.NodeSet => PathResult(val.NodeSet).Length > 0,
     _ => throw new InvalidOperationException($"{val.Type}"),
   };
 
@@ -292,7 +296,9 @@ public ref partial struct Exec
   }
 
   private ReadOnlySpan<char> NodeSetStringValue(int idx) =>
-    NextNode(idx, out var nav) ? NodeStringValue(nav) : [];
+    PathResult(idx) is PooledAppendList<PathContext> { Length: > 0 } nodes
+      ? NodeStringValue(nodes[0].Nav)
+      : [];
 
   private ReadOnlySpan<char> NodeStringValue(XPNavigator nav) =>
     dataBuf[..nav.StringValue(dataBuf)];

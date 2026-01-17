@@ -10,21 +10,19 @@ public partial class XPath
   public readonly string Source;
   public readonly PathOp[] Paths;
   public readonly ValOp[] Vals;
-  public readonly char[] Data;
 
-  private XPath(string source, ReadOnlySpan<PathOp> paths, ReadOnlySpan<ValOp> vals, ReadOnlySpan<char> data)
+  private XPath(string source, ReadOnlySpan<PathOp> paths, ReadOnlySpan<ValOp> vals)
   {
     Source = source;
     Paths = paths.ToArray();
     Vals = vals.ToArray();
-    Data = data.ToArray();
   }
 
   public static XPath Parse(string source)
   {
     var nodes = Parser.Parse(source);
-    Compiler.Compile(source, nodes, out var paths, out var vals, out var data);
-    return new(source, paths, vals, data);
+    Compiler.Compile(source, nodes, out var paths, out var vals);
+    return new(source, paths, vals);
   }
 
   public XPathExecution Exec(XPNodeRef ctx) => new(this, ctx);

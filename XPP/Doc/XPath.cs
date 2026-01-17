@@ -6,6 +6,8 @@ namespace XPP.Doc;
 
 public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
 {
+  public static readonly XPNavigator Invalid = new(XPNodeRef.Invalid);
+
   public readonly XPNodeRef Node = Node;
 
   public XPNavigator Clone() => this;

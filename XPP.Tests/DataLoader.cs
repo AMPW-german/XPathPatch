@@ -12,21 +12,26 @@ public class DataLoader<T>
 {
   private static XmlSerializer Serializer => field ??= new(typeof(TestData<T>));
 
-  public static IEnumerable<object[]> Load(string fname)
+  public static IEnumerable<T> Load(string fname)
   {
     var path = Path.Join(
       typeof(DataLoader<T>).Assembly.Location, "../TestData", fname);
-    Console.WriteLine(path);
+
+    using var f = File.OpenRead(path);
+    return ((TestData<T>)Serializer.Deserialize(f)).Entries;
+  }
+
+  public static IEnumerable<object[]> LoadFilter(string fname, Func<T, bool> fn)
+  {
     try
     {
-      using var f = File.OpenRead(path);
-
-      return ((TestData<T>)Serializer.Deserialize(f)).Entries
-        .Select(t => new object[] {t});
+      return Load(fname)
+        .Where(fn)
+        .Select(v => new object[] { v });
     }
     catch (Exception ex)
     {
-      return [[null, ex.ToString()]];
+      return [[null, ex]];
     }
   }
 }

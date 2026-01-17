@@ -251,4 +251,39 @@
       </Path>
     </Compile>
   </Entry>
+  <Entry Expr="//B/preceding::*//*">
+    <Tokenize>
+      <Tok T="OpSepDesc" V="//" />
+      <Tok T="NtName" V="B" />
+      <Tok T="OpSep" V="/" />
+      <Tok T="AxisName" V="preceding" />
+      <Tok T="Axis" V="::" />
+      <Tok T="NtAny" V="*" />
+      <Tok T="OpSepDesc" V="//" />
+      <Tok T="NtAny" V="*" />
+    </Tokenize>
+    <Compile T="Path">
+      <Path T="Root" />
+      <Path T="Axis" Ax="DescendantOrSelf" Heap="1" Dd="1" />
+      <Path T="Axis" Ax="Child" />
+      <Path T="NameTest" Ns="" N="B" Rev="1" />
+      <Path T="Axis" Ax="Preceding" Heap="1" Fwd="0" Rev="1" Dd="1" />
+      <Path T="Axis" Ax="DescendantOrSelf" Heap="1" Dd="1" />
+      <Path T="Axis" Ax="Child" />
+    </Compile>
+  </Entry>
+  <Entry Expr=".=1">
+    <Tokenize>
+      <Tok T="Self" V="." />
+      <Tok T="OpEq" V="=" />
+      <Tok T="Number" V="1" />
+    </Tokenize>
+    <Compile T="Eq">
+      <L T="Path">
+        <Path T="Context" />
+        <Path T="Axis" Ax="Self" />
+      </L>
+      <R T="Number" Num="1" />
+    </Compile>
+  </Entry>
 </TestData>

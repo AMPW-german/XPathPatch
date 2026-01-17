@@ -1,7 +1,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Xml;
 using XPP.Doc;
 using XPP.Path;
@@ -10,48 +9,49 @@ namespace XPP.Tests;
 
 public partial class XPathTests
 {
-  private static IEnumerable<object[]> ExecNodeTests => Concat(
-    ExecDoc("""
-      <A>
-        <B> <C /> </B>
-        <B> <C /> </B>
-      </A>
-      """,
-      new("A/B/C[1]", "A/B#0/C", "A/B#1/C"),
-      new("(A/B/C)[1]", "A/B#0/C"),
-      new("//*[local-name()='B']", "A/B#0", "A/B#1")),
-    ExecDoc("""
-      <A>
-        <B><C V="1"/><C V="2"/><C V="3"/></B>
-        <B><C V="4"/><C V="5"/><C V="6"/></B>
-      </A>
-      """,
-      new("A/B[sum(C/@V)=6]", "A/B#0"),
-      new("A/B[sum(C/@V)=15]", "A/B#1"))
-  );
-
-  public record class ExecTest(string XPath, params List<Path> Paths);
-
-  private static IEnumerable<object[]> ExecDoc(string xml, params List<ExecTest> tests)
+  private static IEnumerable<object[]> LoadExecTests(string fname)
   {
-    foreach (var test in tests)
-      yield return [xml, test.XPath, test.Paths];
+    Exception loadex = null;
+    IEnumerable<XPathExecEntry> entries = [];
+    try
+    {
+      entries = DataLoader<XPathExecEntry>.Load(fname);
+    }
+    catch (Exception ex)
+    {
+      loadex = ex;
+    }
+    if (loadex != null)
+    {
+      yield return [null, null, loadex];
+      yield break;
+    }
+    foreach (var entry in entries)
+    {
+      foreach (var test in entry.Tests)
+        yield return [entry.Doc, test];
+    }
   }
 
   [TestMethod]
-  [DynamicData(nameof(ExecNodeTests))]
-  public void TestExecNode(string xml, string xpath, List<Path> expected)
+  [DynamicData(nameof(LoadExecTests), ["XPath.Exec.xml"])]
+  public void TestExecNode(XmlElement srcDoc, XPathExecTest test, Exception ex = null)
   {
-    var doc = XPDocument.New();
-    doc.Import(XmlReader.Create(new StringReader(xml)));
+    if (ex != null)
+      throw new Exception("Data Load Failed", ex);
 
+    var doc = XPDocument.New();
+    doc.Import(srcDoc);
     var actual = new List<Path>();
-    foreach (var res in XPath.Exec(xpath, doc.LatestRoot))
+    foreach (var res in XPath.Exec(test.Path, doc.LatestRoot))
     {
       if (res.Type is not XPValueType.NodeSet)
         throw new InvalidOperationException($"{res.Type}");
       actual.Add(Path.FromNode(res.Node));
     }
+    var expected = new List<Path>();
+    foreach (var match in test.Matches)
+      expected.Add(match);
 
     CollectionAssert.AreEqual(expected, actual, ListMsg(expected, actual));
   }

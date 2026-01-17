@@ -1,19 +1,21 @@
 
 using System;
+using System.Collections.Generic;
 using XPP.Path;
 
 namespace XPP.Tests;
 
 public partial class XPathTests
 {
+  private static IEnumerable<object[]> LoadParseTests() =>
+    DataLoader<XPathEntry>.LoadFilter("Xpath.xml", e => e.Parsed != null);
+
   [TestMethod]
-  [DynamicData("Load", typeof(DataLoader<XPathEntry>), ["Xpath.xml"])]
+  [DynamicData(nameof(LoadParseTests))]
   public void TestParse(XPathEntry entry, string err = null)
   {
     if (err != null)
       throw new InvalidOperationException(err);
-    if (entry.Parsed == null)
-      Assert.Inconclusive();
 
     var nodes = Parser.Parse(entry.Expr).ToArray();
     var t = new TreeComparer(entry.Expr);

@@ -53,15 +53,16 @@ public ref partial struct Exec
   public bool MoveNext()
   {
     if (!started)
-      result = GetValue(0, rootContext);
+      result = GetValue(0, new() { Nav = rootContext });
     if (started && result.Type != XPValueType.NodeSet)
       return false;
     started = true;
     if (result.Type == XPValueType.NodeSet)
     {
-      if (!NextNode(result.NodeSet, out var nav))
+      var nodes = PathResult(result.NodeSet);
+      if (resultIndex >= nodes.Length)
         return false;
-      resultNode = nav.Node;
+      resultNode = nodes[resultIndex++].Nav.Node;
     }
     return true;
   }

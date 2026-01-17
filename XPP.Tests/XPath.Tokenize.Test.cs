@@ -7,14 +7,15 @@ namespace XPP.Tests;
 
 public partial class XPathTests
 {
+  private static IEnumerable<object[]> LoadTokenizeTests() =>
+    DataLoader<XPathEntry>.LoadFilter("XPath.xml", e => e.Tokens.Count > 0);
+
   [TestMethod]
-  [DynamicData("Load", typeof(DataLoader<XPathEntry>), ["XPath.xml"])]
-  public void TestTokenize(XPathEntry entry, string err = null)
+  [DynamicData(nameof(LoadTokenizeTests))]
+  public void TestTokenize(XPathEntry entry, Exception ex = null)
   {
-    if (err != null)
-      throw new InvalidOperationException(err);
-    if (entry.Tokens == null || entry.Tokens.Count == 0)
-      Assert.Inconclusive();
+    if (ex != null)
+      throw new Exception("Data Load failed", ex);
     var actual = new List<XPathTok>();
     var tokenizer = new Tokenizer(entry.Expr);
     while (!tokenizer.EOF && tokenizer.Next(out var tok))

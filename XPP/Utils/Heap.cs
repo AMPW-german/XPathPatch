@@ -5,7 +5,16 @@ namespace XPP.Utils;
 
 public partial class Extensions
 {
-  public static void BubbleUp<T>(this AppendList<T> list, int index = 0, bool max = false) where T : notnull, IComparable<T>
+  public static void Heapify<T>(this AppendList<T> list, bool max = false)
+    where T : notnull, IComparable<T>
+  {
+    for (var index = (list.Length >> 1) - 1; index >= 0; index--)
+      BubbleDown(list, index, max);
+  }
+
+  public static void BubbleDown<T>(
+    this AppendList<T> list, int index = 0, bool max = false
+  ) where T : notnull, IComparable<T>
   {
     do
     {
@@ -26,5 +35,16 @@ public partial class Extensions
         return;
       (e, c) = (c, e);
     } while (true);
+  }
+
+  public static void HeapPop<T>(
+    this AppendList<T> list, bool max = false
+  ) where T : notnull, IComparable<T>
+  {
+    if (list.Length == 0)
+      throw new InvalidOperationException();
+    list[0] = list[^1];
+    list.Length--;
+    list.BubbleDown(0, max);
   }
 }
