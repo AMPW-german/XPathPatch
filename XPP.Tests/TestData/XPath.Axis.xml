@@ -27,7 +27,7 @@
           X="1" Y="2" Z="3"
           xmlns:L="1" xmlns:M="2">
           <D child="1" descendant="1" descendant-or-self="2">
-            <E descendant="2"  descendant-or-self="3" />
+            <E descendant="2" descendant-or-self="3" />
           </D>
         </C>
         <C following="1" following-sibling="1">
@@ -57,12 +57,10 @@
     </Test>
     <!-- test each axis to sure we are returning the right nodes -->
     <Test Path="A/B[3]/C[2]/ancestor::*">
-      <Match Path="" />
       <Match Path="A" />
       <Match Path="A/B#2" />
     </Test>
     <Test Path="A/B[3]/C[2]/ancestor-or-self::*">
-      <Match Path="" />
       <Match Path="A" />
       <Match Path="A/B#2" />
       <Match Path="A/B#2/C#1" />
@@ -200,6 +198,36 @@
     </Test>
     <Test Path="A/B[3]/C[2]/self::*[position()=@self]">
       <Match Path="A/B#2/C#1" />
+    </Test>
+    <!-- ensure order on everything -->
+    <Test Path="//*">
+      <Match Path="A" />
+      <Match Path="A/B#0" />
+      <Match Path="A/B#0/C" />
+      <Match Path="A/B#0/C/D" />
+      <Match Path="A/B#0/C/D/E" />
+      <Match Path="A/B#1" />
+      <Match Path="A/B#1/C" />
+      <Match Path="A/B#1/C/D" />
+      <Match Path="A/B#1/C/D/E" />
+      <Match Path="A/B#2" />
+      <Match Path="A/B#2/C#0" />
+      <Match Path="A/B#2/C#0/D" />
+      <Match Path="A/B#2/C#0/D/E" />
+      <Match Path="A/B#2/C#1" />
+      <Match Path="A/B#2/C#1/D" />
+      <Match Path="A/B#2/C#1/D/E" />
+      <Match Path="A/B#2/C#2" />
+      <Match Path="A/B#2/C#2/D" />
+      <Match Path="A/B#2/C#2/D/E" />
+      <Match Path="A/B#3" />
+      <Match Path="A/B#3/C" />
+      <Match Path="A/B#3/C/D" />
+      <Match Path="A/B#3/C/D/E" />
+      <Match Path="A/B#4" />
+      <Match Path="A/B#4/C" />
+      <Match Path="A/B#4/C/D" />
+      <Match Path="A/B#4/C/D/E" />
     </Test>
   </Entry>
 </TestData>

@@ -34,6 +34,7 @@ public partial class Extensions
       if ((max && cmp < 0) || (!max && cmp > 0))
         return;
       (e, c) = (c, e);
+      index = l;
     } while (true);
   }
 

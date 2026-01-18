@@ -1,5 +1,6 @@
 
 using System;
+using XPP.Doc;
 
 namespace XPP.Path;
 
@@ -324,7 +325,32 @@ public static partial class Extensions
       _ => throw new InvalidOperationException($"{axis}"),
     };
 
+    public bool CanInterleave => axis switch
+    {
+      AxisType.Ancestor => true,
+      AxisType.AncestorOrSelf => true,
+      AxisType.Attribute => false,
+      AxisType.Child => true,
+      AxisType.Descendant => true,
+      AxisType.DescendantOrSelf => true,
+      AxisType.Following => true,
+      AxisType.FollowingSibling => true,
+      AxisType.Namespace => false,
+      AxisType.Parent => false,
+      AxisType.Preceding => true,
+      AxisType.PrecedingSibling => true,
+      AxisType.Self => false,
+      _ => throw new InvalidOperationException($"{axis}"),
+    };
+
     public bool IsSingle => axis is AxisType.Parent or AxisType.Self;
+
+    public XPType PrincipalType => axis switch
+    {
+      AxisType.Attribute => XPType.Attribute,
+      AxisType.Namespace => XPType.Namespace,
+      _ => XPType.Element,
+    };
   }
 
   extension(PathOpType type)

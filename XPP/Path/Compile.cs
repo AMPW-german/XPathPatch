@@ -1,5 +1,6 @@
 
 using System;
+using XPP.Doc;
 using XPP.Utils;
 
 namespace XPP.Path;
@@ -29,6 +30,7 @@ public struct PathOp(PathOpType type)
   // NameTest
   public string Ns;
   public string Name;
+  public XPType PType;
 
   // Filter/Expr
   public int Expr;
@@ -184,13 +186,20 @@ public ref struct Compiler
         path.Forward = axis.IsForward;
         if (path.Forward != nextPath.Forward)
           nextPath.Reverse = true;
+        path.Mode = axis.CanInterleave || lastDupe ? PathOpMode.HeapExpand : PathOpMode.Linear;
         lastDupe = axis.CanDupe;
-        path.Mode = axis.CanDupe ? PathOpMode.HeapExpand : PathOpMode.Linear;
       }
       else
       {
         path.Mode = PathOpMode.Linear;
         path.Forward = nextPath.Forward;
+      }
+      if (path.Type is PathOpType.NameTest)
+      {
+        ref var next = ref paths[i + 1];
+        if (next.Type != PathOpType.Axis)
+          throw new InvalidOperationException();
+        path.PType = next.Axis.PrincipalType;
       }
     }
     if (lastDupe)
@@ -394,7 +403,13 @@ public ref struct Compiler
         case AstType.NodeTest:
           switch (node.Token.Type)
           {
-            case TokenType.NtAny: break;
+            case TokenType.NtAny:
+              compiler.AddPath(new(PathOpType.NameTest)
+              {
+                Ns = "",
+                Name = "",
+              });
+              break;
             case TokenType.NtAnyNs:
               compiler.AddPath(new(PathOpType.NameTest)
               {

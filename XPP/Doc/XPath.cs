@@ -133,14 +133,20 @@ public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
     if (a2 && !a1)
       return 1;
 
+    while (!n1.Parent.SameAs(n2.Parent))
+    {
+      n1 = n1.Parent;
+      n2 = n2.Parent;
+    }
+
     n1 = n1.Canon;
     while (n2.Valid)
     {
       if (n1.SameAs(n2))
-        return 1;
+        return -1;
       n2 = n2.PrevSibling;
     }
-    return -1;
+    return 1;
   }
 
   private int Depth()

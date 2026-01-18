@@ -289,7 +289,7 @@ public ref partial struct Exec
     while (!step.Done)
     {
       ref var node = ref step.Prev;
-      if ((op.Ns.Length, op.Name.Length) switch
+      if (node.Nav.Node.Type == op.PType && (op.Ns.Length, op.Name.Length) switch
       {
         (_, > 0) => node.Nav.HasNs(op.Ns) && node.Nav.HasName(op.Name),
         ( > 0, 0) => node.Nav.HasNs(op.Ns),

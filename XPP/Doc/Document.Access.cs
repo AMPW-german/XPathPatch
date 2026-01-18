@@ -219,4 +219,25 @@ public partial struct XPNodeRef
 
   public bool ResolveName(string prefix, string local, out XPName name) =>
     Doc.ResolveName(Id, prefix, local, out name);
+
+  public string DebugName
+  {
+    get
+    {
+      var parent = Parent;
+      var pstring = "";
+      if (parent.Valid && parent.Type != XPType.Document)
+        pstring = parent.DebugName + "/";
+
+      var index = 0;
+      var prev = PrevSibling;
+      while (prev.Valid)
+      {
+        if (prev.Type == Type && prev.Name == Name)
+          index++;
+        prev = prev.PrevSibling;
+      }
+      return $"{pstring}{Name.Local}#{index}";
+    }
+  }
 }
