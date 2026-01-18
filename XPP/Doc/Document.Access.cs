@@ -30,6 +30,7 @@ public partial class XPDocument
   {
     Index = -1,
     Value = "",
+    Depth = -1,
     Parent = -1,
     FirstContent = -1,
     LastContent = -1,
@@ -72,6 +73,7 @@ public partial class XPDocument
   public XPName Name(XPNodeId of) => Lookup(of).Name;
   public string Value(XPNodeId of) => Lookup(of).Value;
   public int EditVersion(XPNodeId of) => Lookup(of).DVersion;
+  public int Depth(XPNodeId of) => Lookup(of).Depth;
 
   public XPNodeRef Canon(XPNodeId of) => MakeRef(of, Lookup(of).Index);
   public XPNodeRef Parent(XPNodeId of) => MakeRef(of, Lookup(of).Parent);
@@ -110,6 +112,50 @@ public partial class XPDocument
       AddNode(node.Index, sb, indent, of.DocVersion, siblings: false);
     return sb.ToString();
   }
+
+  public int Compare(XPNodeId left, XPNodeId right)
+  {
+    var v = left.DocVersion;
+    if (v != right.DocVersion)
+      throw new InvalidOperationException($"doc versions mismatch");
+
+    ref var lnode = ref Latest(left);
+    ref var rnode = ref Latest(right);
+
+    var old = lnode.Depth;
+    var rld = rnode.Depth;
+
+    while (lnode.Depth > rnode.Depth)
+      lnode = ref Latest(lnode.Parent, v);
+    while (rnode.Depth > lnode.Depth)
+      rnode = ref Latest(rnode.Parent, v);
+
+    if (lnode.Index == rnode.Index)
+      return old.CompareTo(rld);
+
+    do
+    {
+      ref var pleft = ref Latest(lnode.Parent, v);
+      ref var pright = ref Latest(rnode.Parent, v);
+      if (pleft.Index == pright.Index)
+        break;
+      lnode = ref pleft;
+      rnode = ref pright;
+    } while (true);
+
+    if (lnode.Type.IsAttribute && !rnode.Type.IsAttribute)
+      return -1;
+    if (rnode.Type.IsAttribute && !lnode.Type.IsAttribute)
+      return 1;
+
+    var cmp = otree.Compare(
+      Latest(lnode.Index, v).Order,
+      Latest(rnode.Index, v).Order);
+
+    if (cmp == 0)
+      return old.CompareTo(rld);
+    return cmp;
+  }
 }
 
 public partial struct XPNodeRef
@@ -118,6 +164,7 @@ public partial struct XPNodeRef
   public XPName Name => Doc?.Name(Id) ?? default;
   public string Value => Doc?.Value(Id) ?? "";
   public int EditVersion => Doc?.EditVersion(Id) ?? -1;
+  public int Depth => Doc?.Depth(Id) ?? -1;
 
   public XPNodeRef Canon => Doc?.Canon(Id) ?? Invalid;
   public XPNodeRef Parent => Doc?.Parent(Id) ?? Invalid;

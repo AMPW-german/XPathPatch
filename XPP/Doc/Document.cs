@@ -11,6 +11,7 @@ public partial class XPDocument
 
   private readonly AppendList<Node> nodes = [];
   private readonly AppendList<int> roots = [];
+  public readonly OrderTree otree = new();
   private int docVersion = 0;
 
   public int Version => docVersion;
@@ -20,7 +21,8 @@ public partial class XPDocument
 
   private XPDocument()
   {
-    NewNode(XPType.Document, default, "");
+    ref var root = ref NewNode(XPType.Document, default, "", 0);
+    root.Order = otree.Root;
     roots.Add(0);
   }
 
@@ -216,7 +218,7 @@ public partial class XPDocument
       parent = pnode.Index;
     }
 
-    ref var node = ref NewNode(type, name, value);
+    ref var node = ref NewNode(type, name, value, pnode.Depth + 1);
     node.Parent = parent;
 
     if (prev == -1)
@@ -226,6 +228,7 @@ public partial class XPDocument
       ref var prevNode = ref Current(prev);
       prevNode.NextSibling = node.Index;
       node.PrevSibling = prevNode.Index;
+      (prevNode.Order, node.Order) = otree.Split(prevNode.Order);
     }
 
     if (next == -1)
@@ -235,10 +238,16 @@ public partial class XPDocument
       ref var nextNode = ref Current(next);
       nextNode.PrevSibling = node.Index;
       node.NextSibling = nextNode.Index;
+      if (prev == -1)
+        (node.Order, nextNode.Order) = otree.Split(nextNode.Order);
     }
+
+    if (prev == -1 && next == -1)
+      node.Order = otree.Root;
 
     return new(this, new(docVersion, node.Index));
   }
+  private static int sibSplits = 0;
 
   public void RemoveNode(int index)
   {
@@ -332,13 +341,15 @@ public partial class XPDocument
     return ref newNode;
   }
 
-  private ref Node NewNode(XPType type, XPName name, string value)
+  private ref Node NewNode(XPType type, XPName name, string value, int depth)
   {
     var idx = nodes.Add(new()
     {
       Type = type,
       Name = name,
       Value = value,
+      Depth = depth,
+      Order = OrderTree.Key.Invalid,
 
       Parent = -1,
       FirstContent = -1,
@@ -378,7 +389,6 @@ public partial class XPDocument
     throw new InvalidOperationException($"{child}");
   }
 
-  // TODO: document order
   private struct Node
   {
     // basic info
@@ -386,6 +396,10 @@ public partial class XPDocument
     public XPType Type;
     public XPName Name; // index in name store
     public string Value;
+    public int Depth;
+
+    // ordering ranges
+    public OrderTree.Key Order;
 
     // link info
     public int Parent;

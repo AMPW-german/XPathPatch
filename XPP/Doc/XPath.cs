@@ -99,15 +99,21 @@ public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
     return length + BuildStringValue(node.FirstContent, buffer[length..]);
   }
 
+  public bool SameAs(XPNavigator other) => Node.SameAs(other.Node);
+
+  public static bool USE_OTREE = true;
+
   public int CompareTo(XPNavigator other)
   {
+    if (USE_OTREE)
+      return Node.Doc.Compare(Node.Id, other.Node.Id);
     if (Node.SameAs(other.Node))
       return 0;
     var n1 = Node;
     var n2 = other.Node;
 
-    var d1 = Depth();
-    var d2 = other.Depth();
+    var d1 = Node.Depth; ;
+    var d2 = other.Node.Depth;
     var initd1 = d1;
     var initd2 = d2;
 
@@ -140,25 +146,33 @@ public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
     }
 
     n1 = n1.Canon;
-    while (n2.Valid)
+    var res = 0;
+    var n2l = n2.PrevSibling;
+    var n2r = n2.NextSibling;
+    while (n2l.Valid || n2r.Valid)
     {
-      if (n1.SameAs(n2))
-        return -1;
-      n2 = n2.PrevSibling;
+      if (n2l.Valid)
+      {
+        if (n2l.SameAs(n1))
+        {
+          res = -1;
+          break;
+        }
+        n2l = n2l.PrevSibling;
+      }
+      if (n2r.Valid)
+      {
+        if (n2r.SameAs(n1))
+        {
+          res = 1;
+          break;
+        }
+        n2r = n2r.NextSibling;
+      }
     }
-    return 1;
-  }
-
-  private int Depth()
-  {
-    var depth = 0;
-    var node = this.Node.Parent;
-    while (node.Valid)
-    {
-      depth++;
-      node = node.Parent;
-    }
-    return depth;
+    if (res == 0)
+      throw new InvalidOperationException();
+    return res;
   }
 
   public string OuterXml() => Node.Doc.ToString(Node.Id);

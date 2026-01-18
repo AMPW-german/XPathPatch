@@ -92,7 +92,7 @@ public ref partial struct Exec
     public void Add(PathContext ctx)
     {
       if (Op.Dedupe && Buffers.Nodes.Length > 0
-          && Buffers.Nodes[^1].Nav.CompareTo(ctx.Nav) == 0)
+          && Buffers.Nodes[^1].Nav.SameAs(ctx.Nav))
         return;
       Buffers.Nodes.Add(new()
       {

@@ -24,14 +24,14 @@ public partial class Extensions
         return;
       if (r < list.Length)
       {
-        var rcmp = list[r].CompareTo(list[l]);
-        if ((max && rcmp > 0) || (!max && rcmp < 0))
+        var lrcmp = list[l].CompareTo(list[r]);
+        if ((max && lrcmp < 0) || (!max && lrcmp > 0))
           l = r;
       }
       ref var e = ref list[index];
       ref var c = ref list[l];
-      var cmp = c.CompareTo(e);
-      if ((max && cmp < 0) || (!max && cmp > 0))
+      var cmp = e.CompareTo(c);
+      if ((max && cmp > 0) || (!max && cmp < 0))
         return;
       (e, c) = (c, e);
       index = l;

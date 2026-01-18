@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace XPP.Utils;
 
@@ -64,16 +65,13 @@ public class AppendList<T> : IEnumerable<T>, IDisposable where T : notnull
 
   protected ref T Ref(int index)
   {
-    var (chunk, offset) = IndexToChunkOffset(index);
+    var (chunk, offset) = (index >> CHUNK_SHIFT, index & CHUNK_MASK);
     if (chunk == chunks.Count)
       chunks.Add(NewChunk());
     return ref chunks[chunk][offset];
   }
 
   protected virtual T[] NewChunk() => new T[CHUNK_SIZE];
-
-  protected static (int, int) IndexToChunkOffset(int index) =>
-    (index >> CHUNK_SHIFT, index & CHUNK_MASK);
 
   public Enumerator GetEnumerator() => new(this);
   IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();

@@ -1,9 +1,10 @@
 
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Xml;
 using XPP.Doc;
-
 using DocXPath = System.Xml.XPath.XPathExpression;
 using XPXPath = XPP.Path.XPath;
 
@@ -16,42 +17,64 @@ public static class Program
 
   public static void Main(string[] args)
   {
-    var doc = new XmlDocument();
-    var xpdoc = XPDocument.New();
-
-    var root = doc.AppendChild(doc.CreateElement("Root"));
-    var xproot = xpdoc.LatestRoot.AddElement("Root");
-
-    var fcount = 0;
+    var fileData = new List<byte[]>();
     foreach (var file in Directory.EnumerateFiles(TestFolder, "*.xml", SearchOption.AllDirectories))
-    {
-      {
-        var fileDoc = new XmlDocument();
-        using var f = File.OpenRead(file);
-        fileDoc.Load(XmlReader.Create(f, new()
-        {
-          IgnoreComments = false,
-          ValidationFlags = 0,
-          ValidationType = ValidationType.None,
-        }));
-        root.AppendChild(doc.ImportNode(fileDoc.DocumentElement, true));
-      }
-      {
-        using var f = File.OpenRead(file);
-        xproot.Import(XmlReader.Create(f, new() { IgnoreWhitespace = true }));
-      }
-      Console.WriteLine(file);
-      if (++fcount >= 5)
-        break;
-    }
+      fileData.Add(File.ReadAllBytes(file));
 
     const string countExpr = "count(//* | //@*)";
-    var countDxp = DocXPath.Compile(countExpr);
-    var countXpp = XPXPath.Parse(countExpr);
 
-    var docRes = root.CreateNavigator().Evaluate(countDxp);
-    Console.WriteLine(docRes);
-    foreach (var val in countXpp.Exec(xproot))
-      Console.WriteLine($"XPP {val.Number}");
+    {
+      var doc = new XmlDocument();
+      var root = doc.AppendChild(doc.CreateElement("Root"));
+      var countDxp = DocXPath.Compile(countExpr);
+
+      using (Time("XmlDocument Import"))
+      {
+        foreach (var file in fileData)
+        {
+          var fdoc = new XmlDocument();
+          fdoc.Load(XmlReader.Create(new MemoryStream(file)));
+          root.AppendChild(doc.ImportNode(fdoc.DocumentElement, true));
+        }
+      }
+
+      using (Time("XmlDocument Eval"))
+      {
+        var docRes = root.CreateNavigator().Evaluate(countDxp);
+        Console.WriteLine($"DOC {docRes}");
+      }
+    }
+
+    {
+      var xpdoc = XPDocument.New();
+      var countXpp = XPXPath.Parse(countExpr);
+      var xproot = xpdoc.LatestRoot.AddElement("Root");
+
+      using (Time("XPDocument Import"))
+      {
+        foreach (var file in fileData)
+          xproot.Import(XmlReader.Create(new MemoryStream(file), new() { IgnoreWhitespace = true }));
+      }
+
+      using (Time("XPDocument Eval"))
+      {
+        foreach (var val in countXpp.Exec(xproot))
+          Console.WriteLine($"XPP {val.Number}");
+      }
+    }
+  }
+
+  private static Timing Time(string name) => new(name);
+
+  private struct Timing(string name) : IDisposable
+  {
+    private readonly string name = name;
+    private readonly Stopwatch stopwatch = Stopwatch.StartNew();
+
+    public void Dispose()
+    {
+      stopwatch.Stop();
+      Console.WriteLine($"{name}: {stopwatch.Elapsed.TotalMilliseconds:0.##}ms");
+    }
   }
 }
