@@ -3,40 +3,30 @@ using System;
 
 namespace XPP.Path;
 
-public readonly struct AstNode(AstType Type, Token Token, int Child0 = -1, int Child1 = -1)
+public class AstNode(AstType Type, Token Token, AstNode Child0 = null, AstNode Child1 = null)
 {
   public readonly AstType Type = Type;
   public readonly Token Token = Token;
-  public readonly int Child0 = Child0;
-  public readonly int Child1 = Child1;
+  public readonly AstNode Child0 = Child0;
+  public readonly AstNode Child1 = Child1;
 }
 
-public ref struct Parser
+public class Parser
 {
-  public static ReadOnlySpan<AstNode> Parse(string source)
+  public static AstNode Parse(string source)
   {
     var parser = new Parser(source);
-    parser.ParseExpr();
-
-    return parser.nodes[..parser.length];
+    return parser.ParseExpr();
   }
 
-  [ThreadStatic]
-  private static AstNode[] nodeBuffer;
-
-  private readonly ReadOnlySpan<char> fullSource;
-  private Tokenizer tokenizer;
-  private readonly Span<AstNode> nodes;
-  private int length = 0;
+  private readonly Tokenizer tokenizer;
 
   private bool hasNext = false;
   private Token next;
 
-  private Parser(ReadOnlySpan<char> source)
+  private Parser(string source)
   {
-    fullSource = source;
     tokenizer = new(source);
-    nodes = nodeBuffer ??= new AstNode[XPath.MAX_LENGTH];
   }
 
   private bool FillNext()
@@ -74,8 +64,6 @@ public ref struct Parser
     return false;
   }
 
-  private bool PeekType(out Token tok, TokenType type) => Peek(out tok) && tok.Type == type;
-
   private bool PeekType(out Token tok, params ReadOnlySpan<TokenType> types)
   {
     if (!Peek(out tok))
@@ -86,27 +74,6 @@ public ref struct Parser
         return true;
     }
     return false;
-  }
-
-  private bool PeekTypeStr(out Token tok, TokenType type, params ReadOnlySpan<string> strs)
-  {
-    if (!PeekType(out tok, type))
-      return false;
-    var tstr = TokStr(tok);
-    foreach (var str in strs)
-    {
-      if (tstr == str)
-        return true;
-    }
-    return false;
-  }
-
-  private bool Take(out Token tok) => Peek(out tok) && !(hasNext = false);
-
-  private void Take()
-  {
-    if (!hasNext) throw new InvalidOperationException();
-    hasNext = false;
   }
 
   private bool TakeType(TokenType type) => PeekType(type) && !(hasNext = false);
@@ -120,42 +87,19 @@ public ref struct Parser
   private bool TakeTypeRange(out Token tok, TokenType min, TokenType max) =>
     Peek(out tok) && tok.Type >= min && tok.Type <= max && !(hasNext = false);
 
-  private bool TakeTypeStr(out Token tok, TokenType type, string str)
-  {
-    if (!PeekType(out tok, type) || TokStr(tok) != str)
-      return false;
-    hasNext = false;
-    return true;
-  }
-
-  private bool TakeTypeStr(out Token tok, TokenType type, params ReadOnlySpan<string> strs) =>
-    PeekTypeStr(out tok, type, strs) && !(hasNext = false);
-
-  private ReadOnlySpan<char> TokStr(Token tok) => fullSource[tok.Data];
-
-  private Exception Invalid(string msg = null) => throw new InvalidOperationException(msg);
-
   private Exception Invalid(TokenType expected)
   {
     Peek(out var tok);
-    throw new InvalidOperationException($"{TokStr(tok)} {tok.Type} != {expected}");
+    throw new InvalidOperationException($"{tok.String} {tok.Type} != {expected}");
   }
 
   private Exception Invalid(params TokenType[] expected)
   {
     Peek(out var tok);
-    throw new InvalidOperationException($"{TokStr(tok)} {tok.Type} != {string.Join(',', expected)}");
+    throw new InvalidOperationException($"{tok.String} {tok.Type} != {string.Join(',', expected)}");
   }
 
-  private int Push(AstNode node)
-  {
-    if (length == nodes.Length)
-      throw new IndexOutOfRangeException();
-    nodes[length] = node;
-    return length++;
-  }
-
-  private int ParseLocationPath()
+  private AstNode ParseLocationPath()
   {
     if (PeekType(TokenType.OpSep, TokenType.OpSepDesc))
       return ParseAbsoluteLocationPath();
@@ -163,40 +107,40 @@ public ref struct Parser
   }
 
   // starts with OpSep or OpSepDesc(via AbbreviatedAbsoluteLocationPath)
-  private int ParseAbsoluteLocationPath()
+  private AstNode ParseAbsoluteLocationPath()
   {
     if (!TakeType(out var tok, TokenType.OpSep, TokenType.OpSepDesc))
       throw Invalid(TokenType.OpSep, TokenType.OpSepDesc);
-    return Push(new(AstType.Root, tok, TryParseRelativeLocationPath()));
+    return new(AstType.Root, tok, TryParseRelativeLocationPath());
   }
 
-  private int TryParseRelativeLocationPath()
+  private AstNode TryParseRelativeLocationPath()
   {
     if (!PeekType(TokenType.Self, TokenType.Parent, TokenType.AxisName, TokenType.Attr, TokenType.NtAny,
         TokenType.NtAnyNs, TokenType.NtName, TokenType.NodeType))
-      return -1;
+      return null;
     return ParseRelativeLocationPath();
   }
 
   // starts with Self|Parent(AbbreviatedStep) AxisName|Attr(AxisSpecifier) NameTest|NodeType(NodeTest)
-  private int ParseRelativeLocationPath()
+  private AstNode ParseRelativeLocationPath()
   {
     // collapsed with AbbreviatedRelativeLocationPath
     var left = ParseStep();
 
     while (TakeType(out var tok, TokenType.OpSep, TokenType.OpSepDesc))
     {
-      left = Push(new(AstType.Sep, tok, left, ParseStep()));
+      left = new(AstType.Sep, tok, left, ParseStep());
     }
 
     return left;
   }
 
-  private int ParseStep()
+  private AstNode ParseStep()
   {
     // AbbreviatedStep
     if (TakeType(out var tok, TokenType.Self, TokenType.Parent))
-      return Push(new(AstType.Axis, tok));
+      return new(AstType.Axis, tok);
 
     // AxisSpecifier
     var hasAxis = TakeType(out var axis, TokenType.AxisName, TokenType.Attr);
@@ -205,7 +149,7 @@ public ref struct Parser
 
     var left = ParseNodeTest();
     if (hasAxis)
-      left = Push(new(AstType.Axis, axis, left));
+      left = new(AstType.Axis, axis, left);
 
     // Predicate*
     while (PeekType(TokenType.BOpen))
@@ -216,10 +160,10 @@ public ref struct Parser
     return left;
   }
 
-  private int ParseNodeTest()
+  private AstNode ParseNodeTest()
   {
     if (TakeTypeRange(out var tok, XPath.MinNt, XPath.MaxNt))
-      return Push(new(AstType.NodeTest, tok));
+      return new(AstType.NodeTest, tok);
 
     if (!TakeType(out tok, TokenType.NodeType))
       throw Invalid(TokenType.NodeType);
@@ -229,7 +173,7 @@ public ref struct Parser
 
     var type = AstType.NodeTest;
 
-    if (TokStr(tok) is "processing-instruction" && TakeType(out var ptype, TokenType.String))
+    if (tok.String is "processing-instruction" && TakeType(out var ptype, TokenType.String))
     {
       type = AstType.ProcType;
       tok = ptype;
@@ -238,10 +182,10 @@ public ref struct Parser
     if (!TakeType(TokenType.PClose))
       throw Invalid(TokenType.PClose);
 
-    return Push(new(type, tok));
+    return new(type, tok);
   }
 
-  private int ParsePredicate(int left, AstType type)
+  private AstNode ParsePredicate(AstNode left, AstType type)
   {
     if (!TakeType(out var tok, TokenType.BOpen))
       throw Invalid(TokenType.BOpen);
@@ -251,15 +195,15 @@ public ref struct Parser
     if (!TakeType(TokenType.BClose))
       throw Invalid(TokenType.BClose);
 
-    return Push(new(type, tok, left, right));
+    return new(type, tok, left, right);
   }
 
-  private int ParseExpr() => ParseOrExpr();
+  private AstNode ParseExpr() => ParseOrExpr();
 
-  private int ParsePrimaryExpr()
+  private AstNode ParsePrimaryExpr()
   {
     if (TakeType(out var tok, TokenType.VarRef, TokenType.String, TokenType.Number))
-      return Push(new(AstType.Value, tok));
+      return new(AstType.Value, tok);
 
     if (TakeType(TokenType.POpen))
     {
@@ -276,42 +220,42 @@ public ref struct Parser
       throw Invalid(TokenType.POpen);
 
     if (TakeType(TokenType.PClose))
-      return Push(new(AstType.FuncCall, fname));
+      return new(AstType.FuncCall, fname);
 
     var args = ParseExpr();
 
     while (TakeType(out tok, TokenType.Comma))
     {
       var arg = ParseExpr();
-      args = Push(new(AstType.ArgList, tok, args, arg));
+      args = new(AstType.ArgList, tok, args, arg);
     }
 
     if (!TakeType(TokenType.PClose))
       throw Invalid(TokenType.PClose);
 
-    return Push(new(AstType.FuncCall, fname, args));
+    return new(AstType.FuncCall, fname, args);
   }
 
-  private int ParseUnionExpr()
+  private AstNode ParseUnionExpr()
   {
     var left = ParsePathExpr();
     while (TakeType(out var tok, TokenType.OpUnion))
-      left = Push(new(AstType.Union, tok, left, ParsePathExpr()));
+      left = new(AstType.Union, tok, left, ParsePathExpr());
     return left;
   }
 
-  private int ParsePathExpr()
+  private AstNode ParsePathExpr()
   {
     if (!PeekType(TokenType.VarRef, TokenType.POpen, TokenType.String, TokenType.Number, TokenType.FuncName))
       return ParseLocationPath();
 
     var left = ParseFilterExpr();
     if (TakeType(out var tok, TokenType.OpSep, TokenType.OpSepDesc))
-      left = Push(new(AstType.Sep, tok, left, ParseRelativeLocationPath()));
+      left = new(AstType.Sep, tok, left, ParseRelativeLocationPath());
     return left;
   }
 
-  private int ParseFilterExpr()
+  private AstNode ParseFilterExpr()
   {
     var left = ParsePrimaryExpr();
     while (PeekType(TokenType.BOpen))
@@ -319,58 +263,58 @@ public ref struct Parser
     return left;
   }
 
-  private int ParseOrExpr()
+  private AstNode ParseOrExpr()
   {
     var left = ParseAndExpr();
     while (TakeType(out var tok, TokenType.OpOr))
-      left = Push(new(AstType.BoolOp, tok, left, ParseAndExpr()));
+      left = new(AstType.BoolOp, tok, left, ParseAndExpr());
     return left;
   }
 
-  private int ParseAndExpr()
+  private AstNode ParseAndExpr()
   {
     var left = ParseEqualityExpr();
     while (TakeType(out var tok, TokenType.OpAnd))
-      left = Push(new(AstType.BoolOp, tok, left, ParseEqualityExpr()));
+      left = new(AstType.BoolOp, tok, left, ParseEqualityExpr());
     return left;
   }
 
-  private int ParseEqualityExpr()
+  private AstNode ParseEqualityExpr()
   {
     var left = ParseRelationalExpr();
     while (TakeType(out var tok, TokenType.OpEq, TokenType.OpNeq))
-      left = Push(new(AstType.CompareOp, tok, left, ParseRelationalExpr()));
+      left = new(AstType.CompareOp, tok, left, ParseRelationalExpr());
     return left;
   }
 
-  private int ParseRelationalExpr()
+  private AstNode ParseRelationalExpr()
   {
     var left = ParseAdditiveExpr();
     while (TakeType(out var tok, TokenType.OpLt, TokenType.OpLte, TokenType.OpGt, TokenType.OpGte))
-      left = Push(new(AstType.CompareOp, tok, left, ParseAdditiveExpr()));
+      left = new(AstType.CompareOp, tok, left, ParseAdditiveExpr());
     return left;
   }
 
-  private int ParseAdditiveExpr()
+  private AstNode ParseAdditiveExpr()
   {
     var left = ParseMultiplicativeExpr();
     while (TakeType(out var tok, TokenType.OpAdd, TokenType.OpSub))
-      left = Push(new(AstType.MathOp, tok, left, ParseMultiplicativeExpr()));
+      left = new(AstType.MathOp, tok, left, ParseMultiplicativeExpr());
     return left;
   }
 
-  private int ParseMultiplicativeExpr()
+  private AstNode ParseMultiplicativeExpr()
   {
     var left = ParseUnaryExpr();
     while (TakeType(out var tok, TokenType.OpMult, TokenType.OpDiv, TokenType.OpMod))
-      left = Push(new(AstType.MathOp, tok, left, ParseUnaryExpr()));
+      left = new(AstType.MathOp, tok, left, ParseUnaryExpr());
     return left;
   }
 
-  private int ParseUnaryExpr()
+  private AstNode ParseUnaryExpr()
   {
     if (TakeType(out var tok, TokenType.OpSub))
-      return Push(new(AstType.Negate, tok, ParseUnionExpr()));
+      return new(AstType.Negate, tok, ParseUnionExpr());
     return ParseUnionExpr();
   }
 }

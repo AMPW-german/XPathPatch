@@ -19,7 +19,7 @@ public partial class XPathTests
     var actual = new List<XPathTok>();
     var tokenizer = new Tokenizer(entry.Expr);
     while (!tokenizer.EOF && tokenizer.Next(out var tok))
-      actual.Add(new() { Type = tok.Type, Value = entry.Expr[tok.Data] });
+      actual.Add(new() { Type = tok.Type, Value = tok.String });
 
     CollectionAssert.AreEqual(entry.Tokens, actual, ListMsg(entry.Tokens, actual));
   }

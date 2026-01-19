@@ -17,9 +17,9 @@ public partial class XPathTests
     if (err != null)
       throw new InvalidOperationException(err);
 
-    var nodes = Parser.Parse(entry.Expr).ToArray();
+    var root = Parser.Parse(entry.Expr);
     var t = new TreeComparer(entry.Expr);
-    XPathAst.TreeCompare(t, entry.Expr, entry.Parsed, nodes, nodes.Length - 1);
+    XPathAst.TreeCompare(t, entry.Parsed, root);
     t.Assert();
   }
 }
@@ -27,27 +27,26 @@ public partial class XPathTests
 public partial class XPathAst
 {
   public static void TreeCompare(
-    TreeComparer t, string source, XPathAst exp, AstNode[] nodes, int index)
+    TreeComparer t, XPathAst exp, AstNode act)
   {
-    if (exp == null && index == -1)
+    if (exp == null && act == null)
       return;
     if (exp == null)
       t.Compare("Node", false, "<null>",
-        $"{nodes[index].Type} '{source[nodes[index].Token.Data]}'");
-    else if (index == -1)
+        $"{act.Type} '{act.Token.String}'");
+    else if (act == null)
       t.Compare("Node", false, $"{exp.Type} '{exp.Value}'", "<null>");
     else
     {
-      var act = nodes[index];
-      var astr = source[act.Token.Data];
+      var astr = act.Token.String;
       t.Compare("Node", exp.Type == act.Type && exp.Value == astr,
         $"{exp.Type} '{exp.Value}'", $"{act.Type} '{astr}'");
     }
-    var (e, a) = (exp?.Left, index == -1 ? -1 : nodes[index].Child0);
-    if (e != null || a != -1)
-      t.Child("Left", t => TreeCompare(t, source, e, nodes, a));
-    (e, a) = (exp?.Right, index == -1 ? -1 : nodes[index].Child1);
-    if (e != null || a != -1)
-      t.Child("Right", t => TreeCompare(t, source, e, nodes, a));
+    var (e, a) = (exp?.Left, act?.Child0);
+    if (e != null || a != null)
+      t.Child("Left", t => TreeCompare(t, e, a));
+    (e, a) = (exp?.Right, act?.Child1);
+    if (e != null || a != null)
+      t.Child("Right", t => TreeCompare(t, e, a));
   }
 }

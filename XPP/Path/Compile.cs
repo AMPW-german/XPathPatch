@@ -1,5 +1,6 @@
 
 using System;
+using System.Collections.Generic;
 using XPP.Doc;
 using XPP.Utils;
 
@@ -57,10 +58,9 @@ public struct ValOp(ValOpType type)
 public ref struct Compiler
 {
   public static void Compile(
-    ReadOnlySpan<char> source, ReadOnlySpan<AstNode> nodes,
-    out ReadOnlySpan<PathOp> paths, out ReadOnlySpan<ValOp> vals)
+    AstNode astRoot, out ReadOnlySpan<PathOp> paths, out ReadOnlySpan<ValOp> vals)
   {
-    var compiler = new Compiler(source, nodes);
+    var compiler = new Compiler(astRoot);
     compiler.Compile();
 
     paths = compiler.paths.Span;
@@ -68,50 +68,52 @@ public ref struct Compiler
   }
 
   // compile state of an AST node
-  private struct State()
+  private class State()
   {
     public int PathStart = -1;
     public int PathIdx = -1;
     public int ValIdx = -1;
-    public AxisType Axis;
+  }
+
+  private class QueueEntry(AstNode Node, bool Path)
+  {
+    public AstNode Node = Node;
+    public bool Path = Path;
   }
 
   private class CompileBuf<O, T>() : ThreadBuf<O, T>(XPath.MAX_LENGTH) where O : CompileBuf<O, T>, new();
   private class PathBuf : CompileBuf<PathBuf, PathOp>;
   private class ValBuf : CompileBuf<ValBuf, ValOp>;
-  private class StateBuf : CompileBuf<StateBuf, State>;
-  private class QueueBuf : CompileBuf<QueueBuf, int>;
 
-  private readonly ReadOnlySpan<char> source;
-  private readonly ReadOnlySpan<AstNode> nodes;
+  private readonly AstNode astRoot;
 
   // result output bufs
   private SpanBuf<PathOp> paths;
   private SpanBuf<ValOp> vals;
 
   // compile states by node
-  private readonly Span<State> states;
-  // compile queue (<0 is ~pathIdx)
-  private SpanBuf<int> queue;
-  private int queuePos = 0;
+  private readonly Dictionary<AstNode, State> states = [];
 
-  private Compiler(ReadOnlySpan<char> source, ReadOnlySpan<AstNode> nodes)
+  private readonly List<QueueEntry> queue = [];
+
+  private Compiler(AstNode astRoot)
   {
-    this.source = source;
-    this.nodes = nodes;
+    this.astRoot = astRoot;
 
     paths = PathBuf.Buf;
     vals = ValBuf.Buf;
+  }
 
-    states = StateBuf.Span;
-    states[..nodes.Length].Fill(new());
-
-    queue = QueueBuf.Buf;
+  private State StateOf(AstNode node)
+  {
+    if (!states.TryGetValue(node, out var state))
+      states[node] = state = new();
+    return state;
   }
 
   private void Compile()
   {
-    QueueExpr(nodes.Length - 1);
+    QueueExpr(astRoot);
     DrainQueue();
 
     var rootNum = -1;
@@ -125,44 +127,46 @@ public ref struct Compiler
 
   private void DrainQueue()
   {
-    while (queuePos < queue.Length)
+    while (queue.Count > 0)
     {
-      var idx = queue[queuePos++];
-      if (idx < 0)
-        CompilePath(~idx);
+      var entry = queue[^1];
+      queue.RemoveAt(queue.Count-1);
+      if (entry.Path)
+        CompilePath(entry.Node);
       else
-        CompileExpr(idx);
+        CompileExpr(entry.Node);
     }
   }
 
-  private void CompileExpr(int index)
+  private void CompileExpr(AstNode node)
   {
     var compile = new ExprCompilePass();
     var backfill = new ExprBackfillPass();
 
-    WalkExpr(index, ref compile);
+    WalkExpr(node, ref compile);
     DrainQueue();
-    WalkExpr(index, ref backfill);
+    WalkExpr(node, ref backfill);
   }
 
-  private void CompilePath(int index)
+  private void CompilePath(AstNode node)
   {
-    states[index].PathStart = paths.Length;
+    var state = StateOf(node);
+    state.PathStart = paths.Length;
 
     var compile = new PathCompilePass();
     var backfill = new PathBackfillPass();
 
-    WalkPath(index, ref compile);
+    WalkPath(node, ref compile);
     if (!paths[^1].Type.IsRoot)
     {
       compile.EnsureAxis(ref this);
       AddPath(new(PathOpType.Context));
     }
     DrainQueue();
-    WalkPath(index, ref backfill);
+    WalkPath(node, ref backfill);
 
     // after we have everything filled in, walk from the end and set mode and flags
-    index = states[index].PathStart;
+    var index = state.PathStart;
     var count = 1;
     while (!paths[index + count - 1].Type.IsRoot) count++;
 
@@ -212,8 +216,8 @@ public ref struct Compiler
     paths[index].Length = count;
   }
 
-  private void QueuePath(int index) => queue.Add(~index);
-  private void QueueExpr(int index) => queue.Add(index);
+  private void QueuePath(AstNode node) => queue.Add(new(node, true));
+  private void QueueExpr(AstNode node) => queue.Add(new(node, false));
 
   private int AddPath(PathOp op) => paths.Add(op);
   private void AddExpr(ref State state, ValOp op)
@@ -224,34 +228,34 @@ public ref struct Compiler
       state.ValIdx = vals.Add(op);
   }
 
-  private int ReserveExpr(int idx)
+  private int ReserveExpr(AstNode node)
   {
-    ref var state = ref states[idx];
+    var state = StateOf(node);
     if (state.ValIdx != -1)
       return state.ValIdx;
     return state.ValIdx = vals.Add(default);
   }
 
-  private int ValOpIndex(int idx)
+  private int ValOpIndex(AstNode node)
   {
-    ref State state = ref states[idx];
+    var state = StateOf(node);
     if (state.ValIdx == -1)
-      throw new InvalidOperationException($"{idx}");
+      throw new InvalidOperationException($"{node.Type}");
     return state.ValIdx;
   }
 
-  private int PathStart(int idx)
+  private int PathStart(AstNode node)
   {
-    ref State state = ref states[idx];
+    var state = StateOf(node);
     if (state.PathStart == -1)
-      throw new InvalidOperationException($"{idx}");
+      throw new InvalidOperationException($"{node.Type}");
     return state.PathStart;
   }
 
   // Initial expression pass. compile nodes and queue paths
   private readonly struct ExprCompilePass : ICompilerPass
   {
-    public void Visit(ref Compiler compiler, int idx, ref readonly AstNode node, ref State state)
+    public void Visit(ref Compiler compiler, AstNode node, State state)
     {
       switch (node.Type)
       {
@@ -263,30 +267,30 @@ public ref struct Compiler
         case AstType.PathFilter:
         case AstType.ExprFilter:
         case AstType.Union:
-          compiler.ReserveExpr(idx);
-          compiler.QueuePath(idx);
+          compiler.ReserveExpr(node);
+          compiler.QueuePath(node);
           break;
         case AstType.Value:
           compiler.AddExpr(ref state, node.Token.Type switch
           {
             TokenType.VarRef =>
-              new(ValOpType.Variable) { String = new(compiler.TokStr(node.Token)[1..]) },
+              new(ValOpType.Variable) { String = node.Token.String[1..] },
             TokenType.String =>
-              new(ValOpType.String) { String = new(compiler.TokStr(node.Token)[1..^1]) },
+              new(ValOpType.String) { String = node.Token.String[1..^1] },
             TokenType.Number =>
-              new(ValOpType.Number) { Number = double.Parse(compiler.TokStr(node.Token)) },
+              new(ValOpType.Number) { Number = double.Parse(node.Token.String) },
             _ => throw new InvalidOperationException($"{node.Token.Type}"),
           });
           break;
         case AstType.FuncCall:
-          var func = XPath.ParseLibraryFunc(compiler.TokStr(node.Token));
+          var func = XPath.ParseLibraryFunc(node.Token.String);
           // reserve spot for func op, then reserve args
-          compiler.ReserveExpr(idx);
+          compiler.ReserveExpr(node);
           var (argStart, argCount) = ReserveArgs(ref compiler, node.Child0);
           var (minArgs, maxArgs) = func.ArgCounts;
           if (argCount < minArgs || argCount > maxArgs)
             throw new InvalidOperationException(
-              $"invalid argcount for {compiler.TokStr(node.Token)}: {argCount} <> [{minArgs},{maxArgs}]");
+              $"invalid argcount for {node.Token.String}: {argCount} <> [{minArgs},{maxArgs}]");
           var argRange = argStart..(argStart + argCount);
           if (func != LibraryFunc.Invalid)
             compiler.AddExpr(ref state,
@@ -294,7 +298,7 @@ public ref struct Compiler
           else
             compiler.AddExpr(ref state, new(ValOpType.UserFunc)
             {
-              String = new(compiler.TokStr(node.Token)),
+              String = new(node.Token.String),
               Args = argRange,
             });
           break;
@@ -302,7 +306,7 @@ public ref struct Compiler
         case AstType.BoolOp:
         case AstType.CompareOp:
         case AstType.MathOp:
-          compiler.ReserveExpr(idx);
+          compiler.ReserveExpr(node);
           compiler.ReserveExpr(node.Child0);
           compiler.ReserveExpr(node.Child1);
           compiler.AddExpr(ref state, new(node.Token.Type.AsValOp)
@@ -312,7 +316,7 @@ public ref struct Compiler
           });
           break;
         case AstType.Negate:
-          compiler.ReserveExpr(idx);
+          compiler.ReserveExpr(node);
           compiler.ReserveExpr(node.Child0);
           compiler.AddExpr(ref state,
             new(node.Token.Type.AsValOp) { Left = compiler.ValOpIndex(node.Child0) });
@@ -320,25 +324,24 @@ public ref struct Compiler
       }
     }
 
-    private static (int first, int count) ReserveArgs(ref Compiler compiler, int idx)
+    private static (int first, int count) ReserveArgs(ref Compiler compiler, AstNode node)
     {
-      if (idx == -1)
+      if (node == null)
         return (0, 0);
-      ref readonly AstNode node = ref compiler.nodes[idx];
       if (node.Type == AstType.ArgList)
       {
         var (first, cleft) = ReserveArgs(ref compiler, node.Child0);
         var (_, cright) = ReserveArgs(ref compiler, node.Child1);
         return (first, cleft + cright);
       }
-      return (compiler.ReserveExpr(idx), 1);
+      return (compiler.ReserveExpr(node), 1);
     }
   }
 
   // backfill path ops after paths are compiled
   private readonly struct ExprBackfillPass : ICompilerPass
   {
-    public void Visit(ref Compiler compiler, int idx, ref readonly AstNode node, ref State state)
+    public void Visit(ref Compiler compiler, AstNode node, State state)
     {
       switch (node.Type)
       {
@@ -351,7 +354,7 @@ public ref struct Compiler
         case AstType.ExprFilter:
         case AstType.Union:
           compiler.AddExpr(ref state,
-            new(ValOpType.Path) { Left = compiler.PathStart(idx) });
+            new(ValOpType.Path) { Left = compiler.PathStart(node) });
           break;
       }
     }
@@ -370,7 +373,7 @@ public ref struct Compiler
       hasAxis = true;
     }
 
-    public void Visit(ref Compiler compiler, int idx, ref readonly AstNode node, ref State state)
+    public void Visit(ref Compiler compiler, AstNode node, State state)
     {
       switch (node.Type)
       {
@@ -391,7 +394,7 @@ public ref struct Compiler
           {
             Axis = node.Token.Type switch
             {
-              TokenType.AxisName => XPath.ParseAxisType(compiler.TokStr(node.Token)),
+              TokenType.AxisName => XPath.ParseAxisType(node.Token.String),
               TokenType.Attr => AxisType.Attribute,
               TokenType.Self => AxisType.Self,
               TokenType.Parent => AxisType.Parent,
@@ -413,19 +416,19 @@ public ref struct Compiler
             case TokenType.NtAnyNs:
               compiler.AddPath(new(PathOpType.NameTest)
               {
-                Ns = new(compiler.TokNs(node.Token)),
+                Ns = TokNs(node.Token),
                 Name = "",
               });
               break;
             case TokenType.NtName:
               compiler.AddPath(new(PathOpType.NameTest)
               {
-                Ns = new(compiler.TokNs(node.Token)),
-                Name = new(compiler.TokName(node.Token)),
+                Ns = TokNs(node.Token),
+                Name = TokName(node.Token),
               });
               break;
             case TokenType.NodeType:
-              var ntype = XPath.ParseNodeType(compiler.TokStr(node.Token));
+              var ntype = XPath.ParseNodeType(node.Token.String);
               if (ntype != NodeType.Node)
                 compiler.AddPath(new(PathOpType.NodeType) { NodeType = ntype });
               break;
@@ -436,7 +439,7 @@ public ref struct Compiler
           break;
         case AstType.ProcType:
           compiler.AddPath(
-            new(PathOpType.NameTest) { Name = new(compiler.TokStr(node.Token)) });
+            new(PathOpType.NameTest) { Name = new(node.Token.String) });
           compiler.AddPath(
             new(PathOpType.NodeType) { NodeType = NodeType.ProcessingInstruction });
           hasAxis = false;
@@ -464,7 +467,7 @@ public ref struct Compiler
         case AstType.Value or AstType.FuncCall:
           // expr index will be backfilled
           state.PathIdx = compiler.AddPath(new(PathOpType.Expr));
-          compiler.QueueExpr(idx);
+          compiler.QueueExpr(node);
           break;
         default:
           throw new InvalidOperationException($"{node.Type}");
@@ -475,7 +478,7 @@ public ref struct Compiler
   // backfill filter and union target indices
   private struct PathBackfillPass() : ICompilerPass
   {
-    public void Visit(ref Compiler compiler, int idx, ref readonly AstNode node, ref State state)
+    public void Visit(ref Compiler compiler, AstNode node, State state)
     {
       switch (node.Type)
       {
@@ -500,27 +503,24 @@ public ref struct Compiler
     }
   }
 
-  private ReadOnlySpan<char> TokStr(Token tok) => source[tok.Data];
-
-  private ReadOnlySpan<char> TokNs(Token tok)
+  private static string TokNs(Token tok)
   {
-    var str = TokStr(tok);
+    var str = tok.String;
     var idx = str.IndexOf(':');
     if (idx == -1)
       return "";
     return str[..idx];
   }
 
-  private ReadOnlySpan<char> TokName(Token tok)
+  private static string TokName(Token tok)
   {
-    var str = TokStr(tok);
+    var str = tok.String;
     var idx = str.IndexOf(':');
     return str[(idx + 1)..];
   }
 
-  private void WalkExpr<T>(int idx, ref T visitor) where T : struct, ICompilerPass, allows ref struct
+  private void WalkExpr<T>(AstNode node, ref T visitor) where T : struct, ICompilerPass, allows ref struct
   {
-    ref readonly var node = ref nodes[idx];
     switch (node.Type)
     {
       // path nodes start a new path. don't walk, just visit
@@ -533,24 +533,24 @@ public ref struct Compiler
       case AstType.ExprFilter:
       case AstType.Union:
       case AstType.Value: // Value is a leaf
-        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        visitor.Visit(ref this, node, StateOf(node));
         break;
 
       case AstType.FuncCall:
-        visitor.Visit(ref this, idx, in node, ref states[idx]);
-        if (node.Child0 != -1)
+        visitor.Visit(ref this, node, StateOf(node));
+        if (node.Child0 != null)
           WalkExpr(node.Child0, ref visitor);
         break;
       case AstType.ArgList:
       case AstType.BoolOp:
       case AstType.CompareOp:
       case AstType.MathOp:
-        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        visitor.Visit(ref this, node, StateOf(node));
         WalkExpr(node.Child0, ref visitor);
         WalkExpr(node.Child1, ref visitor);
         break;
       case AstType.Negate:
-        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        visitor.Visit(ref this, node, StateOf(node));
         WalkExpr(node.Child0, ref visitor);
         break;
       default:
@@ -558,39 +558,38 @@ public ref struct Compiler
     }
   }
 
-  private void WalkPath<T>(int idx, ref T visitor) where T : struct, ICompilerPass, allows ref struct
+  private void WalkPath<T>(AstNode node, ref T visitor) where T : struct, ICompilerPass, allows ref struct
   {
-    ref readonly var node = ref nodes[idx];
     switch (node.Type)
     {
       case AstType.Root:
       case AstType.Axis:
-        if (node.Child0 != -1)
+        if (node.Child0 != null)
           WalkPath(node.Child0, ref visitor);
-        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        visitor.Visit(ref this, node, StateOf(node));
         break;
       case AstType.Sep:
         WalkPath(node.Child1, ref visitor);
-        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        visitor.Visit(ref this, node, StateOf(node));
         WalkPath(node.Child0, ref visitor);
         break;
       case AstType.NodeTest:
       case AstType.ProcType:
       case AstType.Union: // union paths are separate
-        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        visitor.Visit(ref this, node, StateOf(node));
         break;
       case AstType.PathFilter:
-        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        visitor.Visit(ref this, node, StateOf(node));
         WalkPath(node.Child0, ref visitor); // walk parent path, but not predicate expression
         break;
       case AstType.ExprFilter:
         // both children are treated as expressions
-        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        visitor.Visit(ref this, node, StateOf(node));
         break;
       // variables and user funcs could produce nodes, so they are allowed as roots
       case AstType.Value when node.Token.Type is TokenType.VarRef:
       case AstType.FuncCall:
-        visitor.Visit(ref this, idx, in node, ref states[idx]);
+        visitor.Visit(ref this, node, StateOf(node));
         break;
       // expression nodes that couldn't produce nodes should not be children
       case AstType.Value:
@@ -607,6 +606,6 @@ public ref struct Compiler
 
   private interface ICompilerPass
   {
-    public void Visit(ref Compiler compiler, int idx, ref readonly AstNode node, ref State state);
+    public void Visit(ref Compiler compiler, AstNode node, State state);
   }
 }

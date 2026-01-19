@@ -21,7 +21,7 @@ public partial class XPath
   public static XPath Parse(string source)
   {
     var nodes = Parser.Parse(source);
-    Compiler.Compile(source, nodes, out var paths, out var vals);
+    Compiler.Compile(nodes, out var paths, out var vals);
     return new(source, paths, vals);
   }
 

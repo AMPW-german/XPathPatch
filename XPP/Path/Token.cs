@@ -3,27 +3,24 @@ using System;
 
 namespace XPP.Path;
 
-public readonly struct Token(TokenType Type, Range Data)
+public readonly struct Token(TokenType Type, string String)
 {
   public readonly TokenType Type = Type;
-  public readonly Range Data = Data;
+  public readonly string String = String;
 }
 
-public ref struct Tokenizer(ReadOnlySpan<char> source)
+public class Tokenizer(string source)
 {
-  private ReadOnlySpan<char> source = source;
+  private readonly string source = source;
   private int offset;
   private TokenType prev;
 
-  public bool EOF => source.Length == 0;
+  public bool EOF => offset >= source.Length;
 
   private void Advance(int length)
   {
     if (length > 0)
-    {
-      source = source[length..];
       offset += length;
-    }
   }
 
   private void WS()
@@ -35,22 +32,25 @@ public ref struct Tokenizer(ReadOnlySpan<char> source)
 
   private void WS(ref int len)
   {
-    while (len < source.Length && char.IsWhiteSpace(source[len]))
+    while (len+offset < source.Length && char.IsWhiteSpace(source[len+offset]))
       len++;
   }
 
+  private ReadOnlySpan<char> Str(int len) => source.AsSpan(offset, len);
+
   private bool Take(TokenType typ, int length, out Token tok) =>
-    Take(tok = new(typ, offset..(offset + length)));
+    Take(tok = new(typ, new(Str(length))));
 
   private bool Take(Token tok)
   {
     prev = tok.Type;
-    Advance(tok.Data.End.Value - offset);
+    Advance(tok.String.Length);
     return true;
   }
 
   private char At(int index)
   {
+    index += offset;
     if (index >= source.Length)
       return default;
     return source[index];
@@ -104,7 +104,7 @@ public ref struct Tokenizer(ReadOnlySpan<char> source)
   {
     var first = At(0);
     var len = 1;
-    while (len < source.Length && At(len) != first)
+    while (len + offset < source.Length && At(len) != first)
       len++;
     if (At(len) != first)
       return Take(TokenType.Invalid, len, out tok);
@@ -162,25 +162,25 @@ public ref struct Tokenizer(ReadOnlySpan<char> source)
     return Take(TokenType.NtName, qlen, out tok);
   }
 
-  private bool TakeOpName(int len, out Token tok) => Take(len switch
+  private bool TakeOpName(int len, out Token tok) => Take(Str(len) switch
   {
-    3 when source[..len] == "and" => TokenType.OpAnd,
-    2 when source[..len] == "or" => TokenType.OpOr,
-    3 when source[..len] == "mod" => TokenType.OpMod,
-    3 when source[..len] == "div" => TokenType.OpDiv,
+    "and" => TokenType.OpAnd,
+    "or" => TokenType.OpOr,
+    "mod" => TokenType.OpMod,
+    "div" => TokenType.OpDiv,
     _ => TokenType.Invalid,
   }, len, out tok);
 
   private bool TakeNodeTypeOrFunc(int len, out Token tok)
   {
-    if (source[..len] is "node" or "text" or "comment" or "processing-instruction")
+    if (Str(len) is "node" or "text" or "comment" or "processing-instruction")
       return Take(TokenType.NodeType, len, out tok);
     return Take(TokenType.FuncName, len, out tok);
   }
 
   private bool TakeAxisName(int len, out Token tok)
   {
-    if (source[..len] is "ancestor" or "ancestor-or-self" or "attribute" or "child" or "descendant"
+    if (Str(len) is "ancestor" or "ancestor-or-self" or "attribute" or "child" or "descendant"
         or "descendant-or-self" or "following" or "following-sibling" or "namespace" or "parent"
         or "preceding" or "preceding-sibling" or "self")
       return Take(TokenType.AxisName, len, out tok);

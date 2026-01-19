@@ -312,4 +312,16 @@
       <Path T="NameTest" Ns="" N="" Fwd="0" Rev="1" Dd="1" />
     </Compile>
   </Entry>
+  <Entry Expr="(//* | //@*)">
+    <Tokenize>
+      <Tok T="POpen" V="(" />
+      <Tok T="OpSepDesc" V="//" />
+      <Tok T="NtAny" V="*" />
+      <Tok T="OpUnion" V="|" />
+      <Tok T="OpSepDesc" V="//" />
+      <Tok T="Attr" V="@" />
+      <Tok T="NtAny" V="*" />
+      <Tok T="PClose" V=")" />
+    </Tokenize>
+  </Entry>
 </TestData>
