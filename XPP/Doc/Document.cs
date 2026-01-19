@@ -284,6 +284,8 @@ public partial class XPDocument
   {
     if (node == null)
       return null;
+    if (node.DVersion == maxVersion)
+      return node;
     while (node.DVersion < maxVersion && node.VNext is Node next)
     {
       if (next.DVersion > maxVersion)

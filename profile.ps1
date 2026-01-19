@@ -1,0 +1,2 @@
+new-item -path "profiles" -itemtype directory -force | out-null
+dotnet trace collect --format=SpeedScope --output=profiles\xpp.$((get-date -format o).Replace(":", "_")).nettrace -- dotnet .\bin\Debug\XPathPatch.dll

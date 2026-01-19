@@ -3,3 +3,4 @@ obj/
 *.log
 *.out
 **/TestResults/
+profiles/

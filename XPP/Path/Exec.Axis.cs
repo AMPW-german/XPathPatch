@@ -99,7 +99,7 @@ public ref partial struct Exec
     {
       if (nav.FirstChild(out var next))
         return (nav = next).Node.Valid;
-      while (nav.CompareTo(state.Base) != 0)
+      while (!nav.SameAs(state.Base))
       {
         if (nav.NextSibling(out next))
           return (nav = next).Node.Valid;
@@ -237,7 +237,7 @@ public ref partial struct Exec
                   throw new InvalidOperationException();
                 state.Base = next;
                 // if base matches, we are at an ancestor, so don't return it
-                if (state.Base.CompareTo(nav) == 0)
+                if (nav.SameAs(state.Base))
                   continue;
               }
               else
