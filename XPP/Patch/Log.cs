@@ -22,9 +22,9 @@ public class PatchLog
       Type = ActionType.Root,
       InVersion = -1,
       OutVersion = -1,
-      Context = domain.Root.Id,
-      Target = XPNodeId.Invalid,
-      Source = XPNodeId.Invalid,
+      Context = domain.Root,
+      Target = XPNodeRef.Invalid,
+      Source = XPNodeRef.Invalid,
     });
   }
 
@@ -44,12 +44,9 @@ public class PatchLog
     public ActionRef NextSibling => new(Log, treeNode.NextSibling);
     public ActionRef FirstChild => new(Log, treeNode.FirstChild);
 
-    private XPNodeRef MkNodeRef(XPNodeId id) =>
-      Valid && id.Valid ? new(Doc, id) : XPNodeRef.Invalid;
-
-    public XPNodeRef Context => Valid ? MkNodeRef(Action.Context) : XPNodeRef.Invalid;
-    public XPNodeRef Target => Valid ? MkNodeRef(Action.Target) : XPNodeRef.Invalid;
-    public XPNodeRef Source => Valid ? MkNodeRef(Action.Source) : XPNodeRef.Invalid;
+    public XPNodeRef Context => Valid ? Action.Context : XPNodeRef.Invalid;
+    public XPNodeRef Target => Valid ? Action.Target : XPNodeRef.Invalid;
+    public XPNodeRef Source => Valid ? Action.Source : XPNodeRef.Invalid;
 
     public AppendList<ExecValue>.RangeEnumerator TargetResult =>
       Log.pathResults[Action.TargetResult];
@@ -65,7 +62,7 @@ public class PatchLog
 
     public ActionRef AddChild(
       ActionType type,
-      XPNodeId? context = null, XPNodeId? target = null, XPNodeId? source = null,
+      XPNodeRef? context = null, XPNodeRef? target = null, XPNodeRef? source = null,
       PatchPosition pos = default,
       string targetPath = null, Range targetResult = default,
       string sourcePath = null, Range sourceResult = default)
@@ -78,7 +75,7 @@ public class PatchLog
         OutVersion = -1,
         Context = context ?? action.Context,
         Target = target ?? action.Target,
-        Source = source ?? XPNodeId.Invalid,
+        Source = source ?? XPNodeRef.Invalid,
         Position = pos,
         TargetPath = targetPath,
         TargetResult = targetResult,
@@ -93,7 +90,7 @@ public class PatchLog
       ref var action = ref treeNode.Value;
       if (action.InVersion != -1) throw new InvalidOperationException();
       action.InVersion = Doc.Version;
-      action.Context = Context.LatestVersion.Id;
+      action.Context = Context.LatestVersion;
 
       if (action.TargetPath is string targetPath)
       {

@@ -54,11 +54,11 @@ public partial class XPathCPath
 {
   [XmlAttribute("T")] public PathOpType Type;
   [XmlIgnore] public PathOpMode Mode = PathOpMode.Linear;
-  [XmlAttribute("Heap")]
-  public bool _Heap
+  [XmlAttribute("Reo")]
+  public bool _Reorder
   {
-    get => Mode == PathOpMode.HeapExpand;
-    set => Mode = value ? PathOpMode.HeapExpand : PathOpMode.Linear;
+    get => Mode == PathOpMode.InsertExpand;
+    set => Mode = value ? PathOpMode.InsertExpand : PathOpMode.Linear;
   }
   [XmlAttribute("Fwd")] public bool Forward = true;
   [XmlAttribute("Dd")] public bool Dedupe;

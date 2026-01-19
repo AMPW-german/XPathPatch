@@ -42,7 +42,7 @@ public partial class XPathTests
       throw new Exception("Data Load Failed", ex);
 
     var doc = XPDocument.New();
-    doc.Import(srcDoc);
+    doc.LatestRoot.Import(srcDoc);
     var actual = new List<Path>();
     foreach (var res in XPath.Exec(test.Path, doc.LatestRoot))
     {

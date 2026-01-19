@@ -6,141 +6,76 @@ namespace XPP.Doc;
 
 public partial class XPDocument
 {
-  private XPNodeRef MakeRef(XPNodeId from, int index) =>
-    MakeRefAt(from.DocVersion, index);
-
-  private XPNodeRef MakeRefExact(int index)
+  private Node Lookup(VNode vnode, int version, bool allowLate = false)
   {
-    if (index == -1)
-      return XPNodeRef.Invalid;
-    return MakeRefAt(nodes[index].DVersion, index);
-  }
-
-  private XPNodeRef MakeRefAt(int version, int index)
-  {
-    if (index == -1)
-      return XPNodeRef.Invalid;
-    ref var node = ref Latest(index, version);
-    if (node.Removed)
-      return XPNodeRef.Invalid;
-    return new(this, new(version, node.Index));
-  }
-
-  private static readonly Node InvalidNode = new()
-  {
-    Index = -1,
-    Value = "",
-    Depth = -1,
-    Parent = -1,
-    FirstContent = -1,
-    LastContent = -1,
-    FirstAttr = -1,
-    LastAttr = -1,
-    PrevSibling = -1,
-    NextSibling = -1,
-    DVersion = -1,
-    VPrev = -1,
-    VNext = -1,
-    Removed = true,
-  };
-
-  private ref readonly Node Lookup(XPNodeId id)
-  {
-    if (!id.Valid)
-      return ref InvalidNode;
-    return ref Latest(id);
-  }
-
-  private ref readonly Node Lookup(XPNodeId Id, int version, bool allowLate = false)
-  {
-    if (!Id.Valid)
-      return ref InvalidNode;
-    ref var lnode = ref Latest(Id.Index, version);
-    if (!allowLate && lnode.DVersion > version)
-      return ref InvalidNode;
-    return ref lnode;
+    if (vnode.Node == null)
+      return null;
+    var node = Latest(vnode.Node, version);
+    if (!allowLate && node.DVersion > version)
+      return null;
+    return node;
   }
 
   public XPNodeRef Root(int version)
   {
     version = Math.Clamp(version, 0, docVersion);
-    return new(this, new(version, roots[version]));
+    return new(this, roots[version], version);
   }
 
   public XPNodeRef LatestRoot => Root(int.MaxValue);
 
-  public XPType Type(XPNodeId of) => Lookup(of).Type;
-  public XPName Name(XPNodeId of) => Lookup(of).Name;
-  public string Value(XPNodeId of) => Lookup(of).Value;
-  public int EditVersion(XPNodeId of) => Lookup(of).DVersion;
-  public int Depth(XPNodeId of) => Lookup(of).Depth;
-
-  public XPNodeRef Canon(XPNodeId of) => MakeRef(of, Lookup(of).Index);
-  public XPNodeRef Parent(XPNodeId of) => MakeRef(of, Lookup(of).Parent);
-  public XPNodeRef FirstContent(XPNodeId of) => MakeRef(of, Lookup(of).FirstContent);
-  public XPNodeRef LastContent(XPNodeId of) => MakeRef(of, Lookup(of).LastContent);
-  public XPNodeRef FirstAttr(XPNodeId of) => MakeRef(of, Lookup(of).FirstAttr);
-  public XPNodeRef LastAttr(XPNodeId of) => MakeRef(of, Lookup(of).LastAttr);
-  public XPNodeRef PrevSibling(XPNodeId of) => MakeRef(of, Lookup(of).PrevSibling);
-  public XPNodeRef NextSibling(XPNodeId of) => MakeRef(of, Lookup(of).NextSibling);
-  public XPNodeRef PrevVersion(XPNodeId of) => MakeRefExact(Lookup(of).VPrev);
-  public XPNodeRef NextVersion(XPNodeId of) => MakeRefExact(Lookup(of).VPrev);
-  public XPNodeRef FirstVersion(XPNodeId of) => MakeRefExact(Lookup(of, -1, true).Index);
-  public XPNodeRef LatestVersion(XPNodeId of) => MakeRefAt(docVersion, of.Index);
-  public XPNodeRef AtVersion(XPNodeId of, int version) => MakeRefAt(version, of.Index);
-
-  public void SetValue(XPNodeId of, string value)
+  internal void SetValue(VNode of, string value)
   {
-    if (of.DocVersion < docVersion)
+    if (of.Version < docVersion)
       throw new InvalidOperationException("cannot set value of previous version");
-    ref var node = ref Latest(of.Index, of.DocVersion);
+    var node = Latest(of);
     if (!node.Type.HasValue)
       throw new InvalidOperationException($"cannot set value of {node.Type} node");
     if (node.Removed)
       throw new InvalidOperationException($"node has been removed");
-    node = ref Current(node.Index);
+    node = Current(node);
     node.Value = value;
   }
 
-  public string ToString(XPNodeId of, string indent = "")
+  internal string ToString(VNode of, string indent = "")
   {
-    ref readonly var node = ref Lookup(of);
+    var node = Latest(of);
     var sb = new StringBuilder();
     if (node.Type.IsAttribute)
-      AddNodeInline(node.Index, sb, of.DocVersion, siblings: false);
+      AddNodeInline(node, sb, of.Version, siblings: false);
     else
-      AddNode(node.Index, sb, indent, of.DocVersion, siblings: false);
+      AddNode(node, sb, indent, of.Version, siblings: false);
     return sb.ToString();
   }
 
-  public int Compare(XPNodeId left, XPNodeId right)
+  internal int Compare(VNode left, VNode right)
   {
-    var v = left.DocVersion;
-    if (v != right.DocVersion)
+    var v = left.Version;
+    if (v != right.Version)
       throw new InvalidOperationException($"doc versions mismatch");
 
-    ref var lnode = ref Latest(left);
-    ref var rnode = ref Latest(right);
+    var lnode = Latest(left);
+    var rnode = Latest(right);
 
     var old = lnode.Depth;
     var rld = rnode.Depth;
 
     while (lnode.Depth > rnode.Depth)
-      lnode = ref Latest(lnode.Parent, v);
+      lnode = Latest(lnode.Parent, v);
     while (rnode.Depth > lnode.Depth)
-      rnode = ref Latest(rnode.Parent, v);
+      rnode = Latest(rnode.Parent, v);
 
-    if (lnode.Index == rnode.Index)
+    if (lnode == rnode)
       return old.CompareTo(rld);
 
     do
     {
-      ref var pleft = ref Latest(lnode.Parent, v);
-      ref var pright = ref Latest(rnode.Parent, v);
-      if (pleft.Index == pright.Index)
+      var pleft = Latest(lnode.Parent, v);
+      var pright = Latest(rnode.Parent, v);
+      if (pleft == pright)
         break;
-      lnode = ref pleft;
-      rnode = ref pright;
+      lnode = pleft;
+      rnode = pright;
     } while (true);
 
     if (lnode.Type.IsAttribute && !rnode.Type.IsAttribute)
@@ -149,8 +84,8 @@ public partial class XPDocument
       return 1;
 
     var cmp = otree.Compare(
-      Latest(lnode.Index, v).Order,
-      Latest(rnode.Index, v).Order);
+      Latest(lnode, v).Order,
+      Latest(rnode, v).Order);
 
     if (cmp == 0)
       return old.CompareTo(rld);
@@ -160,42 +95,68 @@ public partial class XPDocument
 
 public partial struct XPNodeRef
 {
-  public XPType Type => Doc?.Type(Id) ?? default;
-  public XPName Name => Doc?.Name(Id) ?? default;
-  public string Value => Doc?.Value(Id) ?? "";
-  public int EditVersion => Doc?.EditVersion(Id) ?? -1;
-  public int Depth => Doc?.Depth(Id) ?? -1;
+  internal XPDocument.Node Latest => XPDocument.Latest(Node, Version);
+  internal XPDocument.VNode VNode => new(Latest, Version);
 
-  public XPNodeRef Canon => Doc?.Canon(Id) ?? Invalid;
-  public XPNodeRef Parent => Doc?.Parent(Id) ?? Invalid;
-  public XPNodeRef FirstContent => Doc?.FirstContent(Id) ?? Invalid;
-  public XPNodeRef LastContent => Doc?.LastContent(Id) ?? Invalid;
-  public XPNodeRef FirstAttr => Doc?.FirstAttr(Id) ?? Invalid;
-  public XPNodeRef LastAttr => Doc?.LastAttr(Id) ?? Invalid;
-  public XPNodeRef PrevSibling => Doc?.PrevSibling(Id) ?? Invalid;
-  public XPNodeRef NextSibling => Doc?.NextSibling(Id) ?? Invalid;
-  public XPNodeRef PrevVersion => Doc?.PrevVersion(Id) ?? Invalid;
-  public XPNodeRef NextVersion => Doc?.NextVersion(Id) ?? Invalid;
-  public XPNodeRef FirstVersion => Doc?.FirstVersion(Id) ?? Invalid;
-  public XPNodeRef LatestVersion => Doc?.LatestVersion(Id) ?? Invalid;
-  public XPNodeRef AtVersion(int version) => Doc?.AtVersion(Id, version) ?? Invalid;
+  private XPNodeRef Make(XPDocument.Node node) =>
+    node != null ? new(Doc, node, Version) : Invalid;
+  private XPNodeRef MakeExact(XPDocument.Node node) =>
+    node != null ? new(Doc, node, node.DVersion) : Invalid;
+  private XPNodeRef MakeAt(XPDocument.Node node, int version) =>
+    node != null ? new(Doc, node, version) : Invalid;
+
+  public XPType Type => Latest?.Type ?? default;
+  public XPName Name => Latest?.Name ?? default;
+  public string Value => Latest?.Value ?? "";
+  public int EditVersion => Latest?.DVersion ?? -1;
+  public int Depth => Latest?.Depth ?? -1;
+
+  public XPNodeRef Parent => Make(Latest?.Parent);
+  public XPNodeRef FirstContent => Make(Latest?.FirstContent);
+  public XPNodeRef LastContent => Make(Latest?.LastContent);
+  public XPNodeRef FirstAttr => Make(Latest?.FirstAttr);
+  public XPNodeRef LastAttr => Make(Latest?.LastAttr);
+  public XPNodeRef PrevSibling => Make(Latest?.PrevSibling);
+  public XPNodeRef NextSibling => Make(Latest?.NextSibling);
+  public XPNodeRef PrevVersion => MakeExact(Latest?.VPrev);
+  public XPNodeRef NextVersion => MakeExact(Latest?.VNext);
+  public XPNodeRef FirstVersion
+  {
+    get
+    {
+      var node = Node;
+      while (node?.VPrev != null) node = node.VPrev;
+      return MakeExact(node);
+    }
+  }
+  public XPNodeRef LatestVersion
+  {
+    get
+    {
+      var node = Node;
+      while (node?.VNext != null) node = node.VNext;
+      return MakeAt(node, Doc?.Version ?? -1);
+    }
+  }
+  public XPNodeRef AtVersion(int version) =>
+    MakeAt(XPDocument.Latest(Node, version), version);
   public XPNodeRef AtVersion(Index version) =>
-    Doc?.AtVersion(Id, version.GetOffset(Doc.Version)) ?? Invalid;
+    AtVersion(version.GetOffset(Doc?.Version ?? int.MaxValue));
 
   public XPNodeRef AddChild(
     XPType type, string name, string value = null,
     XPNodeRef? before = null, XPNodeRef? after = null
   ) => Doc?.AddChild(
-      Canon.Id.Index, type, rawName: name, value: value,
-      before: before?.Canon.Id.Index ?? -1, after: after?.Canon.Id.Index ?? -1
+      Node, type, rawName: name, value: value,
+      before: before?.Node, after: after?.Node
     ) ?? Invalid;
 
   public XPNodeRef AddChild(
     XPType type, XPName name, string value = null,
     XPNodeRef? before = null, XPNodeRef? after = null
   ) => Doc?.AddChild(
-      Canon.Id.Index, type, prefixedName: name, value: value,
-      before: before?.Canon.Id.Index ?? -1, after: after?.Canon.Id.Index ?? -1
+      Node, type, prefixedName: name, value: value,
+      before: before?.Node, after: after?.Node
     ) ?? Invalid;
 
   public XPNodeRef AddElement(
@@ -212,11 +173,11 @@ public partial struct XPNodeRef
     XPName name, string value, XPNodeRef? before = null, XPNodeRef? after = null
   ) => AddChild(XPType.Attribute, name, value: value, before: before, after: after);
 
-  public void SetValue(string value) => Doc.SetValue(Id, value);
+  public void SetValue(string value) => Doc.SetValue(VNode, value);
 
-  public void Remove() => Doc.RemoveNode(Canon.Id.Index);
+  public void Remove() => Doc.RemoveNode(Node);
 
-  public bool SameAs(XPNodeRef other) => Valid && Canon.Id.Index == other.Canon.Id.Index;
+  public bool SameAs(XPNodeRef other) => Latest == other.Latest;
 
   public XPNodeRef SetAttribute(string name, string value)
   {
@@ -244,7 +205,7 @@ public partial struct XPNodeRef
   {
     if (!Valid)
       return Invalid;
-    if (!Doc.ResolveName(Id, rawName, out var name))
+    if (!XPDocument.ResolveName(VNode, rawName, out var name))
       return Invalid;
     return Attribute(name);
   }
@@ -262,10 +223,10 @@ public partial struct XPNodeRef
   }
 
   public bool ResolveName(string raw, out XPName name) =>
-    Doc.ResolveName(Id, raw, out name);
+    XPDocument.ResolveName(VNode, raw, out name);
 
   public bool ResolveName(string prefix, string local, out XPName name) =>
-    Doc.ResolveName(Id, prefix, local, out name);
+    XPDocument.ResolveName(VNode, prefix, local, out name);
 
   public string DebugName
   {

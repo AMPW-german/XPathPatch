@@ -1,4 +1,5 @@
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -71,11 +72,11 @@ public partial class PatchTests : BaseTest
     }
 
     var expDoc = XPDocument.New();
-    expDoc.Import(domain.Doc.LatestRoot.FirstContent);
+    expDoc.LatestRoot.Import(domain.Doc.LatestRoot.FirstContent);
     var preExp = pcase.ExpPath.Get(expDoc.LatestRoot);
 
     var subDoc = XPDocument.New();
-    subDoc.Import(XmlReader.Create(
+    subDoc.LatestRoot.Import(XmlReader.Create(
       new StringReader(pcase.Expected),
       new() { IgnoreWhitespace = true }));
 

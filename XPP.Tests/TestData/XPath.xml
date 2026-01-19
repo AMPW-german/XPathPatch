@@ -18,11 +18,11 @@
     </Parse>
     <Compile T="Path">
       <Path T="Context" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="A" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="B" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="" />
     </Compile>
   </Entry>
@@ -56,9 +56,9 @@
       <Path T="Expr">
         <Expr T="Path">
           <Path T="Context" />
-          <Path T="Axis" Ax="Child" Heap="1" />
+          <Path T="Axis" Ax="Child" Reo="1" />
           <Path T="NameTest" Ns="" N="A" />
-          <Path T="Axis" Ax="Child" Heap="1" />
+          <Path T="Axis" Ax="Child" Reo="1" />
           <Path T="NameTest" Ns="" N="B" />
         </Expr>
       </Path>
@@ -102,9 +102,9 @@
           <Path T="Expr">
             <Expr T="Path">
               <Path T="Context" />
-              <Path T="Axis" Ax="Child" Heap="1" />
+              <Path T="Axis" Ax="Child" Reo="1" />
               <Path T="NameTest" Ns="" N="A" />
-              <Path T="Axis" Ax="Child" Heap="1" />
+              <Path T="Axis" Ax="Child" Reo="1" />
               <Path T="NameTest" Ns="" N="B" />
             </Expr>
           </Path>
@@ -148,9 +148,9 @@
     </Parse>
     <Compile T="Path">
       <Path T="Context" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="A" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="B" />
       <Path T="Filter">
         <Expr T="Number" Num="1" />
@@ -189,9 +189,9 @@
     </Parse>
     <Compile T="Path">
       <Path T="Context" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="A" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="B" />
       <Path T="Filter">
         <Expr T="Number" Num="1" />
@@ -236,16 +236,16 @@
     </Parse>
     <Compile T="Path">
       <Path T="Context" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="A" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="B" />
       <Path T="Filter">
         <Expr T="Eq">
           <L T="Func">
             <Arg T="Path">
               <Path T="Context" />
-              <Path T="Axis" Ax="Child" Heap="1" />
+              <Path T="Axis" Ax="Child" Reo="1" />
               <Path T="NameTest" Ns="" N="C" />
               <Path T="Axis" Ax="Attribute" />
               <Path T="NameTest" Ns="" N="V" />
@@ -269,13 +269,13 @@
     </Tokenize>
     <Compile T="Path">
       <Path T="Root" />
-      <Path T="Axis" Ax="DescendantOrSelf" Heap="1" Dd="1" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="DescendantOrSelf" Reo="1" Dd="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="B" Rev="1" />
-      <Path T="Axis" Ax="Preceding" Heap="1" Fwd="0" />
+      <Path T="Axis" Ax="Preceding" Reo="1" Fwd="0" />
       <Path T="NameTest" Ns="" N="" Fwd="0" Dd="1" Rev="1" />
-      <Path T="Axis" Ax="DescendantOrSelf" Heap="1" Dd="1" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="DescendantOrSelf" Reo="1" Dd="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="" />
     </Compile>
   </Entry>
@@ -296,19 +296,19 @@
   <Entry Expr="A/B[3]/C[2]/preceding::*">
     <Compile T="Path">
       <Path T="Context" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="A" />
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="B" />
       <Path T="Filter">
         <Expr T="Number" Num="3" />
       </Path>
-      <Path T="Axis" Ax="Child" Heap="1" />
+      <Path T="Axis" Ax="Child" Reo="1" />
       <Path T="NameTest" Ns="" N="C" />
       <Path T="Filter" Rev="1">
         <Expr T="Number" Num="2" />
       </Path>
-      <Path T="Axis" Ax="Preceding" Fwd="0" Heap="1" />
+      <Path T="Axis" Ax="Preceding" Fwd="0" Reo="1" />
       <Path T="NameTest" Ns="" N="" Fwd="0" Rev="1" Dd="1" />
     </Compile>
   </Entry>

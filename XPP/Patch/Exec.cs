@@ -16,7 +16,7 @@ public class PatchExecutor
     next = Log.Root;
 
     foreach (var patch in Domain.Patches)
-      next.AddChild(ActionType.OpPatch, target: patch.Id);
+      next.AddChild(ActionType.OpPatch, target: patch);
   }
 
   public bool Done => Log.Root.Finished;

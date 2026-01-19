@@ -12,14 +12,17 @@ namespace XPP;
 
 public static class Program
 {
-
   private const string TestFolder = "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Stationeers\\rocketstation_Data\\StreamingAssets";
 
   public static void Main(string[] args)
   {
     var fileData = new List<byte[]>();
     foreach (var file in Directory.EnumerateFiles(TestFolder, "*.xml", SearchOption.AllDirectories))
+    {
+      // if (file.Replace('\\', '/').Contains("/Language/"))
+      //   continue;
       fileData.Add(File.ReadAllBytes(file));
+    }
 
     const string countExpr = "count(//* | //@*)";
 
@@ -56,10 +59,14 @@ public static class Program
           xproot.Import(XmlReader.Create(new MemoryStream(file), new() { IgnoreWhitespace = true }));
       }
 
+      const int EVAL_ITERS = 1;
       using (Time("XPDocument Eval"))
       {
-        foreach (var val in countXpp.Exec(xproot))
-          Console.WriteLine($"XPP {val.Number}");
+        Path.ExecValue res = default;
+        for (var i = 0; i < EVAL_ITERS; i++)
+          foreach (var val in countXpp.Exec(xproot))
+            res = val;
+        Console.WriteLine($"XPP {res.Number}");
       }
     }
   }

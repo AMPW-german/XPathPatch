@@ -6,7 +6,7 @@ namespace XPP.Doc;
 
 public partial class XPDocument
 {
-  public XPNodeRef Import(XmlNode node, int parent = 0)
+  internal XPNodeRef Import(XmlNode node, Node parent)
   {
     switch (node.NodeType)
     {
@@ -32,25 +32,25 @@ public partial class XPDocument
     }
   }
 
-  private XPNodeRef ImportElement(XmlElement el, int parent)
+  private XPNodeRef ImportElement(XmlElement el, Node parent)
   {
-    var elId = AddChild(parent, XPType.Element, prefixedName: PrefixedName(el)).Id;
+    var elRef = AddChild(parent, XPType.Element, prefixedName: PrefixedName(el));
     var attrs = el.Attributes;
     for (var i = 0; i < attrs.Count; i++)
-      Import(attrs[i], elId.Index);
+      Import(attrs[i], elRef.Node);
     var child = el.FirstChild;
     while (child != null)
     {
-      Import(child, elId.Index);
+      Import(child, elRef.Node);
       child = child.NextSibling;
     }
-    return new(this, elId);
+    return elRef;
   }
 
   private static XPName PrefixedName(XmlNode node) =>
     new("", node.Prefix, node.LocalName);
 
-  public XPNodeRef Import(XmlReader reader, int parent = 0, bool interior = false)
+  internal XPNodeRef Import(XmlReader reader, Node parent, bool interior = false)
   {
     if (reader.Settings?.IgnoreWhitespace != true)
       reader = XmlReader.Create(reader, new() { IgnoreWhitespace = true });
@@ -62,7 +62,7 @@ public partial class XPDocument
     throw new InvalidOperationException($"Unexpected EOF");
   }
 
-  private XPNodeRef ImportInternal(XmlReader reader, int parent)
+  private XPNodeRef ImportInternal(XmlReader reader, Node parent)
   {
     switch (reader.NodeType)
     {
@@ -92,24 +92,24 @@ public partial class XPDocument
     }
   }
 
-  private XPNodeRef ImportElement(XmlReader reader, int parent)
+  private XPNodeRef ImportElement(XmlReader reader, Node parent)
   {
-    var el = AddChild(parent, XPType.Element, prefixedName: PrefixedName(reader)).Id;
+    var el = AddChild(parent, XPType.Element, prefixedName: PrefixedName(reader));
     if (reader.MoveToFirstAttribute())
     {
       do
       {
-        ImportInternal(reader, el.Index);
+        ImportInternal(reader, el.Node);
       } while (reader.MoveToNextAttribute());
       reader.MoveToElement();
     }
     if (reader.IsEmptyElement)
-      return new(this, el);
+      return el;
     while (reader.Read())
     {
       if (reader.NodeType == XmlNodeType.EndElement)
-        return new(this, el);
-      ImportInternal(reader, el.Index);
+        return el;
+      ImportInternal(reader, el.Node);
     }
     throw new InvalidOperationException($"unexpected EOF");
   }
@@ -117,47 +117,47 @@ public partial class XPDocument
   private static XPName PrefixedName(XmlReader reader) =>
     new("", reader.Prefix, reader.LocalName);
 
-  public XPNodeRef Import(
-    XPNodeRef node, int parent = 0, int before = -1, int after = -1)
+  internal XPNodeRef Import(
+    XPNodeRef nref, Node parent, Node before = null, Node after = null)
   {
-    if (!node.Valid)
+    if (!nref.Valid)
       throw new InvalidOperationException($"invalid node");
-    if (node.Doc == this && node.Id.DocVersion == docVersion && node.Type.CanHaveContent)
+    if (nref.Doc == this && nref.Version == docVersion && nref.Type.CanHaveContent)
     {
       // if copying a node that can have children from the live version of this doc,
       // check that we aren't copying into a child node
-      var nindex = node.Canon.Id.Index;
-      ref var pnode = ref Latest(parent);
+      var node = nref.Latest;
+      parent = Latest(parent);
       while (true)
       {
-        if (pnode.Index == nindex)
+        if (parent == node)
           throw new InvalidOperationException("cannot copy a parent into its child");
-        if (pnode.Parent == -1)
+        if (parent.Parent == null)
           break;
-        pnode = ref Latest(pnode.Parent);
+        parent = Latest(parent.Parent);
       }
     }
-    return ImportInternal(node, parent, false, before, after);
+    return ImportInternal(nref, parent, false, before, after);
   }
 
   private XPNodeRef ImportInternal(
-    XPNodeRef node, int parent, bool siblings, int before = -1, int after = -1)
+    XPNodeRef node, Node parent, bool siblings, Node before = null, Node after = null)
   {
-    var inode = XPNodeId.Invalid;
+    var inode = XPNodeRef.Invalid;
     while (node.Valid)
     {
       inode = AddChild(
         parent, node.Type,
         prefixedName: node.Name, value: node.Value,
         before: before, after: after
-      ).Id;
-      ImportInternal(node.FirstAttr, inode.Index, true);
-      ImportInternal(node.FirstContent, inode.Index, true);
+      );
+      ImportInternal(node.FirstAttr, inode.Node, true);
+      ImportInternal(node.FirstContent, inode.Node, true);
       if (!siblings)
-        return new(this, inode);
+        return inode;
       node = node.NextSibling;
     }
-    return new(this, inode);
+    return inode;
   }
 }
 
@@ -165,28 +165,27 @@ public partial struct XPNodeRef
 {
   public XPNodeRef Import(XmlNode node)
   {
-    if (Id.DocVersion != Doc.Version)
+    if (Version != Doc.Version)
       throw new InvalidOperationException($"Cannot import to previous version");
-    return Doc.Import(node, Canon.Id.Index);
+    return Doc.Import(node, Latest);
   }
 
   public XPNodeRef Import(XmlReader reader, bool interior = false)
   {
-    if (Id.DocVersion != Doc.Version)
+    if (Version != Doc.Version)
       throw new InvalidOperationException($"Cannot import to previous version");
-    return Doc.Import(reader, Canon.Id.Index, interior);
+    return Doc.Import(reader, Latest, interior);
   }
 
   public XPNodeRef Import(
     XPNodeRef node, XPNodeRef? before = null, XPNodeRef? after = null)
   {
-    if (Id.DocVersion != Doc.Version)
+    if (Version != Doc.Version)
       throw new InvalidOperationException($"Cannot import to previous version");
-    if (before is XPNodeRef beforeNode && beforeNode.Id.DocVersion != Doc.Version)
+    if (before is XPNodeRef beforeNode && beforeNode.Version != Doc.Version)
       throw new InvalidOperationException($"Cannot import before previous version");
-    if (after is XPNodeRef afterNode && afterNode.Id.DocVersion != Doc.Version)
+    if (after is XPNodeRef afterNode && afterNode.Version != Doc.Version)
       throw new InvalidOperationException($"Cannot import after previous version");
-    return Doc.Import(
-      node, Canon.Id.Index, before?.Canon.Id.Index ?? -1, after?.Canon.Id.Index ?? -1);
+    return Doc.Import(node, Latest, before?.Latest, after?.Latest);
   }
 }

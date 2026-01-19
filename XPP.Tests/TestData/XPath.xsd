@@ -212,7 +212,7 @@
       <xs:element name="Expr" minOccurs="0" type="XPathCExpr" />
     </xs:sequence>
     <xs:attribute name="T" type="PathOpType" use="required" />
-    <xs:attribute name="Heap" type="xs:boolean" />
+    <xs:attribute name="Reo" type="xs:boolean" />
     <xs:attribute name="Fwd" type="xs:boolean" />
     <xs:attribute name="Dd" type="xs:boolean" />
     <xs:attribute name="Rev" type="xs:boolean" />

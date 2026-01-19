@@ -104,7 +104,7 @@ public enum PathOpMode
 {
   // FullNorm, // get full results, then sort and dedupe
   Linear, // copy matching into next buffer
-  HeapExpand, // treat source buffer as heap. expand into next buffer from lowest
+  InsertExpand, // shift source elements forward in list after each expansion to maintain order
 }
 
 public enum ValOpType

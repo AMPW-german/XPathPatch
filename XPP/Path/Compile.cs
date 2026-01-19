@@ -186,7 +186,7 @@ public ref struct Compiler
         path.Forward = axis.IsForward;
         if (path.Forward != nextPath.Forward)
           nextPath.Reverse = true;
-        path.Mode = axis.CanInterleave || lastDupe ? PathOpMode.HeapExpand : PathOpMode.Linear;
+        path.Mode = axis.CanInterleave || lastDupe ? PathOpMode.InsertExpand : PathOpMode.Linear;
         lastDupe = axis.CanDupe;
       }
       else

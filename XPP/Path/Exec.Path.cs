@@ -68,7 +68,7 @@ public ref partial struct Exec
       switch (Op.Mode)
       {
         case PathOpMode.Linear: break;
-        case PathOpMode.HeapExpand: Buffers.PrevNodes.Heapify(!Op.Forward); break;
+        case PathOpMode.InsertExpand: break;
         default: throw new InvalidOperationException($"{Op.Mode}");
       }
       if (reindex)
@@ -120,8 +120,19 @@ public ref partial struct Exec
       switch (Op.Mode)
       {
         case PathOpMode.Linear: break;
-        case PathOpMode.HeapExpand:
-          Buffers.PrevNodes.BubbleDown(Index, !Op.Forward);
+        case PathOpMode.InsertExpand:
+          var prevs = Buffers.PrevNodes;
+          ref var node = ref prevs[Index];
+          var fwd = Op.Forward;
+          for (var i = Index; i < prevs.Length - 1; i++)
+          {
+            ref var next = ref prevs[i + 1];
+            var cmp = node.CompareTo(next);
+            if ((fwd && cmp <= 0) || (!fwd && cmp >= 0))
+              break;
+            (node, next) = (next, node);
+            node = ref next;
+          }
           break;
         default: throw new InvalidOperationException($"{Op.Mode}");
       }
@@ -132,7 +143,7 @@ public ref partial struct Exec
       switch (Op.Mode)
       {
         case PathOpMode.Linear: Index++; break;
-        case PathOpMode.HeapExpand: Buffers.PrevNodes.HeapPop(!Op.Forward); break;
+        case PathOpMode.InsertExpand: Index++; break;
         default: throw new InvalidOperationException($"{Op.Mode}");
       }
     }

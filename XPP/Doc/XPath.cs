@@ -11,7 +11,7 @@ public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
   public readonly XPNodeRef Node = Node;
 
   public XPNavigator Clone() => this;
-  public XPNavigator Root() => new(Node.Doc.Root(Node.Id.DocVersion));
+  public XPNavigator Root() => new(Node.Doc.Root(Node.Version));
   public NodeType Type() => Node.Type switch
   {
     XPType.Invalid => NodeType.Invalid,
@@ -106,13 +106,13 @@ public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
   public int CompareTo(XPNavigator other)
   {
     if (USE_OTREE)
-      return Node.Doc.Compare(Node.Id, other.Node.Id);
+      return Node.Doc.Compare(Node.VNode, other.Node.VNode);
     if (Node.SameAs(other.Node))
       return 0;
     var n1 = Node;
     var n2 = other.Node;
 
-    var d1 = Node.Depth; ;
+    var d1 = Node.Depth;
     var d2 = other.Node.Depth;
     var initd1 = d1;
     var initd2 = d2;
@@ -128,16 +128,8 @@ public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
       d2--;
     }
 
-    var a1 = Node.Type.IsAttribute;
-    var a2 = other.Node.Type.IsAttribute;
-
     if (n1.SameAs(n2))
       return initd1 > initd2 ? 1 : -1;
-
-    if (a1 && !a2)
-      return -1;
-    if (a2 && !a1)
-      return 1;
 
     while (!n1.Parent.SameAs(n2.Parent))
     {
@@ -145,37 +137,48 @@ public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
       n2 = n2.Parent;
     }
 
-    n1 = n1.Canon;
+    var a1 = n1.Type.IsAttribute;
+    var a2 = n2.Type.IsAttribute;
+
+    if (a1 && !a2)
+      return -1;
+    if (a2 && !a1)
+      return 1;
+
     var res = 0;
     var n2l = n2.PrevSibling;
     var n2r = n2.NextSibling;
     while (n2l.Valid || n2r.Valid)
     {
-      if (n2l.Valid)
+      if (!n2l.Valid)
       {
-        if (n2l.SameAs(n1))
-        {
-          res = -1;
-          break;
-        }
-        n2l = n2l.PrevSibling;
+        res = 1;
+        break;
       }
-      if (n2r.Valid)
+      if (!n2r.Valid)
       {
-        if (n2r.SameAs(n1))
-        {
-          res = 1;
-          break;
-        }
-        n2r = n2r.NextSibling;
+        res = -1;
+        break;
       }
+      if (n2l.SameAs(n1))
+      {
+        res = -1;
+        break;
+      }
+      n2l = n2l.PrevSibling;
+      if (n2r.SameAs(n1))
+      {
+        res = 1;
+        break;
+      }
+      n2r = n2r.NextSibling;
     }
     if (res == 0)
-      throw new InvalidOperationException();
+      throw new InvalidOperationException($"{n1.Type} {n1.Name.Local} {n2.Type} {n2.Name.Local}");
     return res;
   }
 
-  public string OuterXml() => Node.Doc.ToString(Node.Id);
+  public string OuterXml() => Node.Doc.ToString(Node.VNode);
 }
 
 public partial struct XPNodeRef

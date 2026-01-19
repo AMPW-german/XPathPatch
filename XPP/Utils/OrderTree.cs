@@ -33,10 +33,10 @@ public class OrderTree
     ref var node = ref nodes[parent.KeyIndex];
     if (node.Left == -1)
     {
-      var mid = node.Min + ((node.Max - node.Min) >> 1);
+      var mid = GetMid(node.Min, node.Max);
       if (mid == node.Min || mid == node.Max)
-        Rebalance();
-      mid = node.Min + ((node.Max - node.Min) >> 1);
+        Rebalance(parent.KeyIndex);
+      mid = GetMid(node.Min, node.Max);
       if (mid == node.Min || mid == node.Max)
         throw new InvalidOperationException();
 
@@ -46,16 +46,33 @@ public class OrderTree
     return (new(node.Left), new(node.Right));
   }
 
-  private void Rebalance()
+  private static ulong GetMid(ulong min, ulong max)
+  {
+    // the vast majority of insertions are at the end during document parsing
+    // prefer the start of the range to leave room for later insertions
+    var diff = (max - min) >> 1;
+    if (diff >= 0x10000)
+      diff >>= 8;
+    else if (diff >= 0x1000)
+      diff >>= 6;
+    else if (diff > 0x100)
+      diff >>= 4;
+    else if (diff > 0x10)
+      diff >>= 2;
+    return min + diff;
+  }
+
+  private void Rebalance(int fromKey)
   {
     // update counts
     for (var i = nodes.Length; --i >= 0;)
     {
       ref var node = ref nodes[i];
+      var baseSz = (i == fromKey) ? nodes.Length : 1;
       if (node.Left != -1)
-        node.Size = 1 + nodes[node.Left].Size + nodes[node.Right].Size;
+        node.Size = baseSz + nodes[node.Left].Size + nodes[node.Right].Size;
       else
-        node.Size = 1;
+        node.Size = baseSz;
     }
 
     var totalSize = nodes[0].Size;

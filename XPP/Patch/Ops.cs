@@ -60,7 +60,7 @@ public class PatchFile : PatchOp
   // TODO: priority/ordering
 
   public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
-    parent.AddChild(ActionType.OpPatch, target: node.Id);
+    parent.AddChild(ActionType.OpPatch, target: node);
 }
 
 public class CopyPatch : PatchOp
@@ -69,34 +69,34 @@ public class CopyPatch : PatchOp
 
   public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
     parent.AddChild(
-      ActionType.OpCopy, target: node.Id, pos: Pos, targetPath: Path, sourcePath: From);
+      ActionType.OpCopy, target: node, pos: Pos, targetPath: Path, sourcePath: From);
 }
 
 public class MergePatch : PatchOp
 {
   public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
     parent.AddChild(
-      ActionType.OpMerge, target: node.Id, targetPath: Path, sourcePath: From);
+      ActionType.OpMerge, target: node, targetPath: Path, sourcePath: From);
 }
 
 public class DeletePatch : PatchOp
 {
   public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
-    parent.AddChild(ActionType.OpDelete, target: node.Id, targetPath: Path);
+    parent.AddChild(ActionType.OpDelete, target: node, targetPath: Path);
 }
 
 public class IfPatch : PatchOp
 {
   public override void Build(PatchLog.ActionRef parent, XPNodeRef node)
   {
-    var action = parent.AddChild(ActionType.OpIf, target: node.Id, targetPath: Path);
+    var action = parent.AddChild(ActionType.OpIf, target: node, targetPath: Path);
     var child = node.FirstContent;
     while (child.Valid)
     {
       if (child.Type is XPType.Element && child.Name == new XPName("", "", "Any"))
-        action.AddChild(ActionType.OpIfAny, target: child.Id);
+        action.AddChild(ActionType.OpIfAny, target: child);
       else if (child.Type is XPType.Element && child.Name == new XPName("", "", "None"))
-        action.AddChild(ActionType.OpIfNone, target: child.Id);
+        action.AddChild(ActionType.OpIfNone, target: child);
       child = child.NextSibling;
     }
   }
@@ -105,17 +105,17 @@ public class IfPatch : PatchOp
 public class IfAnyPatch : PatchOp
 {
   public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
-    parent.AddChild(ActionType.OpIfAny, target: node.Id, targetPath: Path);
+    parent.AddChild(ActionType.OpIfAny, target: node, targetPath: Path);
 }
 
 public class IfNonePatch : PatchOp
 {
   public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
-    parent.AddChild(ActionType.OpIfNone, target: node.Id, targetPath: Path);
+    parent.AddChild(ActionType.OpIfNone, target: node, targetPath: Path);
 }
 
 public class WithPatch : PatchOp
 {
   public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
-    parent.AddChild(ActionType.OpWith, target: node.Id, targetPath: Path);
+    parent.AddChild(ActionType.OpWith, target: node, targetPath: Path);
 }

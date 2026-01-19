@@ -9,21 +9,19 @@ public partial class XPDocument
   public const string XMLNS_PREFIX = "xmlns";
   public const string XMLNS_URI = "http://www.w3.org/2000/xmlns/";
 
-  private readonly AppendList<Node> nodes = [];
-  private readonly AppendList<int> roots = [];
+  private readonly AppendList<Node> roots = [];
   public readonly OrderTree otree = new();
   private int docVersion = 0;
 
   public int Version => docVersion;
-  public int TotalNodes => nodes.Length;
 
   public static XPDocument New() => new();
 
   private XPDocument()
   {
-    ref var root = ref NewNode(XPType.Document, default, "", 0);
+    var root = NewNode(XPType.Document, default, "", 0);
     root.Order = otree.Root;
-    roots.Add(0);
+    roots.Add(root);
   }
 
   public void NewVersion()
@@ -32,7 +30,7 @@ public partial class XPDocument
     roots.Add(roots[^1]);
   }
 
-  public bool ResolveName(XPNodeId id, string name, out XPName resolved)
+  internal static bool ResolveName(VNode vnode, string name, out XPName resolved)
   {
     XPName.Parts(name, out var prefix, out var local);
     if (prefix.Length == 0)
@@ -46,10 +44,10 @@ public partial class XPDocument
       return true;
     }
 
-    return ResolveName(id, new(prefix), new(local), out resolved);
+    return ResolveName(vnode, new(prefix), new(local), out resolved);
   }
 
-  public bool ResolveName(XPNodeId id, string prefix, string local, out XPName resolved)
+  internal static bool ResolveName(VNode vnode, string prefix, string local, out XPName resolved)
   {
     if (prefix == "")
     {
@@ -61,77 +59,75 @@ public partial class XPDocument
       resolved = new(XMLNS_URI, XMLNS_PREFIX, local);
       return true;
     }
-    var index = id.Index;
-    while (index != -1)
+    var node = vnode.Node;
+    var version = vnode.Version;
+    while (node != null)
     {
-      ref var node = ref Latest(index, id.DocVersion);
-      var nsIdx = node.FirstAttr;
-      while (nsIdx != -1)
+      node = Latest(node, version);
+      var ns = node.FirstAttr;
+      while (ns != null)
       {
-        ref var nsNode = ref Latest(nsIdx, id.DocVersion);
-        if (nsNode.Type is XPType.Namespace && prefix == nsNode.Name.Local)
+        ns = Latest(ns, version);
+        if (ns.Type is XPType.Namespace && prefix == ns.Name.Local)
         {
-          resolved = new(nsNode.Value, new(prefix), new(local));
+          resolved = new(ns.Value, new(prefix), new(local));
           return true;
         }
-        nsIdx = nsNode.NextSibling;
+        ns = ns.NextSibling;
       }
-      index = node.Parent;
+      node = node.Parent;
     }
 
     resolved = new("", prefix, local);
     return false;
   }
 
-  private void ValidateParentBeforeAfter(int parent, XPType childType, int before, int after)
+  private void ValidateParentBeforeAfter(Node parent, XPType childType, Node before, Node after)
   {
-    if (before != -1 && after != -1)
+    if (before != null && after != null)
       throw new InvalidOperationException($"cannot specify both before and after nodes");
 
-    ref var pnode = ref Latest(parent);
-    if (pnode.Removed)
-      throw new InvalidOperationException($"parent has been removed");
-    if (pnode.Index != parent)
+    if (parent.VNext != null)
       throw new InvalidOperationException($"parent is not latest version");
+    if (parent.Removed)
+      throw new InvalidOperationException($"parent has been removed");
 
-    if (!pnode.Type.CanHaveChild(childType))
-      throw new InvalidOperationException($"{childType} cannot be child of {pnode.Type}");
+    if (!parent.Type.CanHaveChild(childType))
+      throw new InvalidOperationException($"{childType} cannot be child of {parent.Type}");
 
-    if (pnode.Type.HasSingleChild && FirstChild(ref pnode, childType) != -1)
-      throw new InvalidOperationException($"parent {pnode.Type} can only have one child {childType}");
+    if (parent.Type.HasSingleChild && FirstChild(parent, childType) != null)
+      throw new InvalidOperationException($"parent {parent.Type} can only have one child {childType}");
 
-    if (before != -1)
+    if (before != null)
     {
-      ref var bnode = ref Latest(before);
-      if (bnode.Removed)
-        throw new InvalidOperationException($"before has been removed");
-      if (bnode.Index != before)
+      if (before.VNext != null)
         throw new InvalidOperationException($"before is not latest version");
-      if (Latest(bnode.Parent).Index != parent)
+      if (before.Removed)
+        throw new InvalidOperationException($"before has been removed");
+      if (before.Parent != parent)
         throw new InvalidOperationException($"before is not child of parent");
-      if (!bnode.Type.SameChildTypeAs(childType))
+      if (!before.Type.SameChildTypeAs(childType))
         throw new InvalidOperationException(
-          $"before {bnode.Type} is not same child type as {childType}");
+          $"before {before.Type} is not same child type as {childType}");
     }
-    if (after != -1)
+    if (after != null)
     {
-      ref var anode = ref Latest(after);
-      if (anode.Removed)
-        throw new InvalidOperationException($"after has been removed");
-      if (anode.Index != after)
+      if (after.VNext != null)
         throw new InvalidOperationException($"after is not latest version");
-      if (Latest(anode.Parent).Index != parent)
+      if (after.Removed)
+        throw new InvalidOperationException($"after has been removed");
+      if (after.Parent != parent)
         throw new InvalidOperationException($"after is not child of parent");
-      if (!anode.Type.SameChildTypeAs(childType))
+      if (!after.Type.SameChildTypeAs(childType))
         throw new InvalidOperationException(
-          $"after {anode.Type} is not same child type as {childType}");
+          $"after {after.Type} is not same child type as {childType}");
     }
   }
 
-  public XPNodeRef AddChild(
-    int parent, XPType type,
+  internal XPNodeRef AddChild(
+    Node parent, XPType type,
     string rawName = null, XPName? prefixedName = null, string value = "",
-    int before = -1, int after = -1)
+    Node before = null, Node after = null)
   {
     value ??= "";
 
@@ -146,25 +142,24 @@ public partial class XPDocument
     if (!type.HasValue && value != "")
       throw new InvalidOperationException($"{type} node must not have value");
 
-    ref var pnode = ref nodes[parent];
+    if (before == null && after == null)
+      after = LastChild(parent, type);
 
-    if (before == -1 && after == -1)
-      after = LastChild(ref pnode, type);
+    Node prev = after, next = before;
 
-    var (prev, next) = (-1, -1);
-    if (before != -1)
-      (prev, next) = (Latest(before).PrevSibling, before);
-    if (after != -1)
-      (prev, next) = (after, Latest(after).NextSibling);
+    if (prev != null)
+      next = Latest(prev.NextSibling);
+    else if (next != null)
+      prev = Latest(next.PrevSibling);
 
     XPName name;
     if (type.HasName)
     {
       bool validName;
       if (prefixedName is XPName parsed)
-        validName = ResolveName(new(docVersion, parent), parsed.Prefix, parsed.Local, out name);
+        validName = ResolveName(new(parent, docVersion), parsed.Prefix, parsed.Local, out name);
       else
-        validName = ResolveName(new(docVersion, parent), rawName, out name);
+        validName = ResolveName(new(parent, docVersion), rawName, out name);
       if (!validName)
         throw new InvalidOperationException($"unknown prefix '{name.Prefix}'");
 
@@ -178,172 +173,150 @@ public partial class XPDocument
 
     if (type.DistinctName)
     {
-      var sibIdx = FirstChild(ref pnode, type);
-      while (sibIdx != -1)
+      var sibling = FirstChild(parent, type);
+      while (sibling != null)
       {
-        ref var sibling = ref nodes[sibIdx];
         if (sibling.Name == name)
           throw new InvalidOperationException($"{type} node must have distinct name in parent");
-        sibIdx = sibling.NextSibling;
+        sibling = Latest(sibling.NextSibling);
       }
     }
     if (type.SiblingsMerge)
     {
-      if (prev != -1)
+      if (prev != null && prev.Type == type)
       {
-        ref var prevNode = ref Latest(prev);
-        if (prevNode.Type == type)
-        {
-          prevNode = ref Current(prev);
-          prevNode.Value += value;
-          return new(this, new(docVersion, prevNode.Index));
-        }
+        prev = Current(prev);
+        prev.Value += value;
+        return new(this, prev, docVersion);
       }
-      if (next != -1)
+      if (next != null && next.Type == type)
       {
-        ref var nextNode = ref Latest(next);
-        if (nextNode.Type == type)
-        {
-          nextNode = ref Current(next);
-          nextNode.Value = value + nextNode.Value;
-          return new(this, new(docVersion, nextNode.Index));
-        }
+        next = Current(next);
+        next.Value = value + next.Value;
+        return new(this, next, docVersion);
       }
     }
 
     // if we are first or last, we need a current parent
-    if (prev == -1 || next == -1)
-    {
-      pnode = ref Current(parent);
-      parent = pnode.Index;
-    }
+    if (prev == null || next == null)
+      parent = Current(parent);
 
-    ref var node = ref NewNode(type, name, value, pnode.Depth + 1);
+    var node = NewNode(type, name, value, parent.Depth + 1);
     node.Parent = parent;
 
-    if (prev == -1)
-      FirstChild(ref pnode, type) = node.Index;
+    if (prev == null)
+      FirstChild(parent, type) = node;
     else
     {
-      ref var prevNode = ref Current(prev);
-      prevNode.NextSibling = node.Index;
-      node.PrevSibling = prevNode.Index;
-      (prevNode.Order, node.Order) = otree.Split(prevNode.Order);
+      prev = Current(prev);
+      prev.NextSibling = node;
+      node.PrevSibling = prev;
+      (prev.Order, node.Order) = otree.Split(prev.Order);
     }
 
-    if (next == -1)
-      LastChild(ref pnode, type) = node.Index;
+    if (next == null)
+      LastChild(parent, type) = node;
     else
     {
-      ref var nextNode = ref Current(next);
-      nextNode.PrevSibling = node.Index;
-      node.NextSibling = nextNode.Index;
-      if (prev == -1)
-        (node.Order, nextNode.Order) = otree.Split(nextNode.Order);
+      next = Current(next);
+      next.PrevSibling = node;
+      node.NextSibling = next;
+      if (prev == null)
+        (node.Order, next.Order) = otree.Split(next.Order);
     }
 
-    if (prev == -1 && next == -1)
+    if (prev == null && next == null)
       node.Order = otree.Root;
 
-    return new(this, new(docVersion, node.Index));
+    return new(this, node, docVersion);
   }
-  private static int sibSplits = 0;
 
-  public void RemoveNode(int index)
+  internal void RemoveNode(Node node)
   {
-    ref var node = ref nodes[index];
-    if (node.VNext != -1)
+    if (node.VNext != null)
       throw new InvalidOperationException($"node is not latest version");
     if (node.Removed)
       throw new InvalidOperationException($"node has already been removed");
-    if (node.Parent == -1)
+    if (node.Parent == null)
       throw new InvalidOperationException($"cannot remove root document node");
-    TombstoneTree(index);
+    TombstoneTree(node);
 
-    node = ref Latest(index);
-    if (node.Parent != -1 && (node.PrevSibling == -1 || node.NextSibling == -1))
+    if (node.Parent != null && (node.PrevSibling == null || node.NextSibling == null))
     {
-      ref var pnode = ref Current(node.Parent);
+      var parent = Current(node.Parent);
       if (node.Type.IsAttribute)
       {
-        if (node.PrevSibling == -1)
-          pnode.FirstAttr = node.NextSibling;
-        if (node.NextSibling == -1)
-          pnode.LastAttr = node.PrevSibling;
+        if (node.PrevSibling == null)
+          parent.FirstAttr = node.NextSibling;
+        if (node.NextSibling == null)
+          parent.LastAttr = node.PrevSibling;
       }
       else if (node.Type.IsContent)
       {
-        if (node.PrevSibling == -1)
-          pnode.FirstContent = node.NextSibling;
-        if (node.NextSibling == -1)
-          pnode.LastContent = node.PrevSibling;
+        if (node.PrevSibling == null)
+          parent.FirstContent = node.NextSibling;
+        if (node.NextSibling == null)
+          parent.LastContent = node.PrevSibling;
       }
     }
-    if (node.PrevSibling != -1)
-    {
-      ref var prev = ref Current(node.PrevSibling);
-      prev.NextSibling = node.NextSibling;
-    }
-    if (node.NextSibling != -1)
-    {
-      ref var next = ref Current(node.NextSibling);
-      next.PrevSibling = node.PrevSibling;
-    }
+    if (node.PrevSibling != null)
+      Current(node.PrevSibling).NextSibling = node.NextSibling;
+    if (node.NextSibling != null)
+      Current(node.NextSibling).PrevSibling = node.PrevSibling;
   }
 
-  private void TombstoneTree(int index, bool siblings = false)
+  private void TombstoneTree(Node node, bool siblings = false)
   {
-    if (index == -1)
+    if (node == null)
       return;
     do
     {
-      ref var node = ref Current(index);
+      node = Current(node);
       node.Removed = true;
       TombstoneTree(node.FirstAttr, true);
       TombstoneTree(node.FirstContent, true);
-      index = node.NextSibling;
-    } while (siblings && index != -1);
+      node = node.NextSibling;
+    } while (siblings && node != null);
   }
 
-  private ref Node Latest(XPNodeId id) => ref Latest(id.Index, id.DocVersion);
-  private ref Node Latest(int index, int maxVersion = int.MaxValue)
+  internal static Node Latest(VNode nref) => Latest(nref.Node, nref.Version);
+  internal static Node Latest(Node node, int maxVersion = int.MaxValue)
   {
-    ref var node = ref nodes[index];
-    while (node.DVersion < maxVersion && node.VNext != -1)
+    if (node == null)
+      return null;
+    while (node.DVersion < maxVersion && node.VNext is Node next)
     {
-      ref var next = ref nodes[node.VNext];
       if (next.DVersion > maxVersion)
         break;
-      node = ref next;
+      node = next;
     }
-    while (node.DVersion > maxVersion && node.VPrev != -1)
-      node = ref nodes[node.VPrev];
-    return ref node;
+    while (node.DVersion > maxVersion && node.VPrev is Node prev)
+      node = prev;
+    return node;
   }
 
-  private ref Node Current(int index)
+  private Node Current(Node node)
   {
-    ref var node = ref Latest(index);
+    node = Latest(node);
     if (node.DVersion == docVersion)
-      return ref node;
+      return node;
 
     // if the latest isn't on the current version, make a new node
-    index = nodes.Add(ref node);
-    ref var newNode = ref nodes[index];
-    newNode.Index = node.VNext = index;
-    newNode.VPrev = node.Index;
-    newNode.VNext = -1;
+    var newNode = new Node(node);
+    newNode.VPrev = node;
+    newNode.VNext = null;
     newNode.DVersion = docVersion;
+    node.VNext = newNode;
 
-    if (node.Index == roots[docVersion])
-      roots[docVersion] = index;
+    if (newNode.Depth == 0)
+      roots[docVersion] = newNode;
 
-    return ref newNode;
+    return newNode;
   }
 
-  private ref Node NewNode(XPType type, XPName name, string value, int depth)
+  private Node NewNode(XPType type, XPName name, string value, int depth)
   {
-    var idx = nodes.Add(new()
+    return new()
     {
       Type = type,
       Name = name,
@@ -351,27 +324,24 @@ public partial class XPDocument
       Depth = depth,
       Order = OrderTree.Key.Invalid,
 
-      Parent = -1,
-      FirstContent = -1,
-      LastContent = -1,
-      FirstAttr = -1,
-      LastAttr = -1,
-      PrevSibling = -1,
-      NextSibling = -1,
+      Parent = null,
+      FirstContent = null,
+      LastContent = null,
+      FirstAttr = null,
+      LastAttr = null,
+      PrevSibling = null,
+      NextSibling = null,
 
       DVersion = docVersion,
 
-      VPrev = -1,
-      VNext = -1,
+      VPrev = null,
+      VNext = null,
 
       Removed = false,
-    });
-    ref var node = ref nodes[idx];
-    node.Index = idx;
-    return ref node;
+    };
   }
 
-  private static ref int FirstChild(ref Node node, XPType child)
+  private static ref Node FirstChild(Node node, XPType child)
   {
     if (child.IsAttribute)
       return ref node.FirstAttr;
@@ -380,7 +350,7 @@ public partial class XPDocument
     throw new InvalidOperationException($"{child}");
   }
 
-  private static ref int LastChild(ref Node node, XPType child)
+  private static ref Node LastChild(Node node, XPType child)
   {
     if (child.IsAttribute)
       return ref node.LastAttr;
@@ -389,12 +359,11 @@ public partial class XPDocument
     throw new InvalidOperationException($"{child}");
   }
 
-  private struct Node
+  internal class Node
   {
     // basic info
-    public int Index; // self index in node list
     public XPType Type;
-    public XPName Name; // index in name store
+    public XPName Name;
     public string Value;
     public int Depth;
 
@@ -402,22 +371,50 @@ public partial class XPDocument
     public OrderTree.Key Order;
 
     // link info
-    public int Parent;
-    public int FirstContent;
-    public int LastContent;
-    public int FirstAttr;
-    public int LastAttr;
-    public int PrevSibling;
-    public int NextSibling;
+    public Node Parent;
+    public Node FirstContent;
+    public Node LastContent;
+    public Node FirstAttr;
+    public Node LastAttr;
+    public Node PrevSibling;
+    public Node NextSibling;
 
     // version info
     public int DVersion; // document version
     // node list indices of versions of this node
-    public int VPrev;
-    public int VNext;
+    public Node VPrev;
+    public Node VNext;
 
     // remove flag
     public bool Removed;
+
+    public Node() { }
+
+    public Node(Node other)
+    {
+      Type = other.Type;
+      Name = other.Name;
+      Value = other.Value;
+      Depth = other.Depth;
+      Order = other.Order;
+      Parent = other.Parent;
+      FirstContent = other.FirstContent;
+      LastContent = other.LastContent;
+      FirstAttr = other.FirstAttr;
+      LastAttr = other.LastAttr;
+      PrevSibling = other.PrevSibling;
+      NextSibling = other.NextSibling;
+      DVersion = other.DVersion;
+      VPrev = other.VPrev;
+      VNext = other.VNext;
+      Removed = other.Removed;
+    }
+  }
+
+  internal readonly struct VNode(Node Node, int Version)
+  {
+    public readonly Node Node = Node;
+    public readonly int Version = Version;
   }
 }
 
@@ -450,20 +447,19 @@ public readonly struct XPName(string NsUri, string Prefix, string Local) : IEqua
   }
 }
 
-public readonly struct XPNodeId(int DocVersion, int Index)
+public readonly partial struct XPNodeRef
 {
-  public static readonly XPNodeId Invalid = new(-1, -1);
+  public static readonly XPNodeRef Invalid = new(null, null, -1);
 
-  public readonly int DocVersion = DocVersion;
-  public readonly int Index = Index;
-  public bool Valid => DocVersion >= 0 && Index >= 0;
-}
+  internal XPNodeRef(XPDocument Doc, XPDocument.Node Node, int Version)
+  {
+    this.Doc = Doc;
+    this.Node = Node;
+    this.Version = Version;
+  }
 
-public readonly partial struct XPNodeRef(XPDocument Doc, XPNodeId Id)
-{
-  public static readonly XPNodeRef Invalid = new(null, XPNodeId.Invalid);
-
-  public readonly XPDocument Doc = Doc;
-  public readonly XPNodeId Id = Id;
-  public bool Valid => Doc != null && Id.Valid;
+  public readonly XPDocument Doc;
+  internal readonly XPDocument.Node Node;
+  public readonly int Version;
+  public bool Valid => Doc != null && Node != null;
 }

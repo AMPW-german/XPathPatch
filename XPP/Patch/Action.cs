@@ -47,9 +47,9 @@ public struct PatchAction
   public int InVersion;
   public int OutVersion;
 
-  public XPNodeId Context;
-  public XPNodeId Target;
-  public XPNodeId Source;
+  public XPNodeRef Context;
+  public XPNodeRef Target;
+  public XPNodeRef Source;
   public PatchPosition Position;
 
   // xpath query strings and ranges in log values list
@@ -140,11 +140,11 @@ public static class PatchActions
     {
       if (src.Type is XPValueType.NodeSet)
         action.AddChild(
-          ActionType.Insert, target: copyTgt.Id, source: src.Node.Id, pos: pos);
+          ActionType.Insert, target: copyTgt, source: src.Node, pos: pos);
       else
       {
         var insert = action.AddChild(
-          ActionType.InsertText, target: copyTgt.Id, pos: pos);
+          ActionType.InsertText, target: copyTgt, pos: pos);
         insert.SetSourceResult(new ExecValue(src.StringValue));
       }
     }
@@ -177,7 +177,7 @@ public static class PatchActions
       default:
         throw new InvalidOperationException($"{action.Action.Position}");
     }
-    var copy = action.AddChild(ActionType.Set, target: target.Id);
+    var copy = action.AddChild(ActionType.Set, target: target);
     copy.SetSourceResult(new ExecValue(strVal));
   }
 
@@ -206,7 +206,7 @@ public static class PatchActions
         if (source.Type is not XPType.Element)
           throw new InvalidOperationException(
             $"Path must select Elements, not {source.Type}");
-        action.AddChild(ActionType.Merge, target: target.Id, source: source.Id);
+        action.AddChild(ActionType.Merge, target: target, source: source);
       }
     }
   }
@@ -221,7 +221,7 @@ public static class PatchActions
           $"Path must return NodeSet, not {val.Type}");
       var node = val.Node.LatestVersion;
       if (node.Valid)
-        action.AddChild(ActionType.Remove, target: node.Id);
+        action.AddChild(ActionType.Remove, target: node);
     }
   }
 
@@ -277,7 +277,7 @@ public static class PatchActions
           $"Path must return NodeSet, not {val.Type}");
       action.AddChild(
         ActionType.WithCtx,
-        context: val.Node.Id
+        context: val.Node
       );
     }
   }
@@ -388,13 +388,13 @@ public static class PatchActions
       }
       var tgtAttr = target.Attribute(srcAttr.Name);
       if (tgtAttr.Valid)
-        action.AddChild(ActionType.Set, target: tgtAttr.Id, source: srcAttr.Id);
+        action.AddChild(ActionType.Set, target: tgtAttr, source: srcAttr);
       else if (mergePos is PatchPosition.Prepend && target.FirstAttr.Valid)
         action.AddChild(ActionType.Insert,
-          target: target.FirstAttr.Id, source: srcAttr.Id, pos: PatchPosition.Before);
+          target: target.FirstAttr, source: srcAttr, pos: PatchPosition.Before);
       else
         action.AddChild(ActionType.Insert,
-          target: target.Id, source: srcAttr.Id, pos: PatchPosition.Append);
+          target: target, source: srcAttr, pos: PatchPosition.Append);
 
       srcAttr = srcAttr.NextSibling;
     }
@@ -404,13 +404,13 @@ public static class PatchActions
     {
       var mergeTgt = FindMergeTarget(srcChild, target);
       if (mergeTgt.Valid)
-        action.AddChild(ActionType.Merge, target: mergeTgt.Id, source: srcChild.Id);
+        action.AddChild(ActionType.Merge, target: mergeTgt, source: srcChild);
       else if (mergePos is PatchPosition.Prepend && target.FirstContent.Valid)
         action.AddChild(ActionType.Insert,
-          target: target.FirstContent.Id, source: srcChild.Id, pos: PatchPosition.Before);
+          target: target.FirstContent, source: srcChild, pos: PatchPosition.Before);
       else
         action.AddChild(ActionType.Insert,
-          target: target.Id, source: srcChild.Id, pos: PatchPosition.Append);
+          target: target, source: srcChild, pos: PatchPosition.Append);
       srcChild = srcChild.NextSibling;
     }
   }

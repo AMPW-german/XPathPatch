@@ -16,11 +16,11 @@ public partial class XPDocument
   }
 
   private void AddNode(
-    int index, StringBuilder sb, string indent, int version, bool siblings = true)
+    Node node, StringBuilder sb, string indent, int version, bool siblings = true)
   {
-    while (index != -1)
+    while (node != null)
     {
-      ref var node = ref Latest(index, version);
+      node = Latest(node, version);
       switch (node.Type)
       {
         case XPType.Document:
@@ -30,7 +30,7 @@ public partial class XPDocument
           sb.Append(indent).Append('<');
           sb.AppendXPName(node.Name);
           AddNodeInline(node.FirstAttr, sb, version);
-          if (node.FirstContent == -1)
+          if (node.FirstContent == null)
           {
             sb.AppendLine(" />");
             break;
@@ -57,16 +57,16 @@ public partial class XPDocument
       }
       if (!siblings)
         break;
-      index = node.NextSibling;
+      node = node.NextSibling;
     }
   }
 
   private void AddNodeInline(
-    int index, StringBuilder sb, int version, bool siblings = true)
+    Node node, StringBuilder sb, int version, bool siblings = true)
   {
-    while (index != -1)
+    while (node != null)
     {
-      ref var node = ref Latest(index, version);
+      node = Latest(node, version);
       switch (node.Type)
       {
         case XPType.Namespace:
@@ -81,25 +81,7 @@ public partial class XPDocument
       }
       if (!siblings)
         break;
-      index = node.NextSibling;
-    }
-  }
-
-  public void DebugDump()
-  {
-    Console.WriteLine($"V: {docVersion}");
-    for (var i = 0; i <= docVersion; i++)
-      Console.WriteLine($"ROOT {i} {roots[i]}");
-    for (var i = 0; i < nodes.Length; i++)
-    {
-      ref var node = ref nodes[i];
-      Console.WriteLine(
-        $"NODE {i}={node.Index} {node.Type} " +
-        $"[{node.Name.NsUri}]{node.Name.Prefix}:{node.Name.Local} = '{node.Value}' " +
-        $"^{node.Parent} {node.PrevSibling}<>{node.NextSibling} " +
-        $"a{node.FirstAttr}..{node.LastAttr} c{node.FirstContent}..{node.LastContent} " +
-        $"v{node.DVersion} {node.VPrev}<>{node.VNext}"
-      );
+      node = node.NextSibling;
     }
   }
 }
@@ -122,4 +104,9 @@ public static partial class Extensions
     var quote = value.Contains('"') ? '\'' : '"';
     return sb.Append(quote).Append(value).Append(quote);
   }
+}
+
+public partial struct XPNodeRef
+{
+  public override string ToString() => Doc?.ToString(VNode) ?? "";
 }
