@@ -232,6 +232,8 @@ public partial struct XPNodeRef
   {
     get
     {
+      if (!Valid)
+        return "Invalid";
       var parent = Parent;
       var pstring = "";
       if (parent.Valid && parent.Type != XPType.Document)

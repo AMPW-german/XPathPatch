@@ -6,6 +6,64 @@ using XPP.Utils;
 
 namespace XPP.Path;
 
+public struct ExecValue2(XPValueType type)
+{
+  public XPValueType Type = type;
+  public bool Bool;
+  public double Number;
+  public string String;
+  public ExecPathOp NodeSet;
+
+  public ExecValue2(bool val) : this(XPValueType.Bool) => Bool = val;
+  public ExecValue2(double val) : this(XPValueType.Number) => Number = val;
+  public ExecValue2(string val) : this(XPValueType.String) => String = val;
+  public ExecValue2(ReadOnlySpan<char> val) : this(XPValueType.String) => String = new(val);
+  public ExecValue2(ExecPathOp val) : this(XPValueType.NodeSet) => NodeSet = val;
+
+  public bool BoolValue => throw new NotImplementedException();
+}
+
+public abstract class ExecExprOp()
+{
+  public abstract ExecValue2 Value(ExecPathCtx context);
+}
+
+public class ExecExprOpPath(ExecPathOp Path) : ExecExprOp()
+{
+  public readonly ExecPathOp Path = Path;
+
+  public override ExecValue2 Value(ExecPathCtx context)
+  {
+    Path.Init(context.Nav);
+    return new(Path);
+  }
+}
+
+public class ExecExprOpTempCount(ExecExprOp Arg) : ExecExprOp()
+{
+  public readonly ExecExprOp Arg = Arg;
+
+  public override ExecValue2 Value(ExecPathCtx context)
+  {
+    var val = Arg.Value(context);
+    if (val.Type != XPValueType.NodeSet)
+      throw new InvalidOperationException($"Arg must be NodeSet, not {val.Type}");
+    var count = 0;
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    var nextPrint = 1000;
+    foreach (var node in val.NodeSet)
+    {
+      count++;
+      if ((count & 0xFFFF) == 0 && stopwatch.Elapsed.TotalMilliseconds > nextPrint)
+      {
+        Console.WriteLine(count);
+        nextPrint += 1000;
+      }
+    }
+    return new(count);
+  }
+}
+
 public ref partial struct Exec
 {
   private struct Value(XPValueType type)
