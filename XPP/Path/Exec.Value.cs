@@ -264,24 +264,3 @@ public class ExecExprOpMath(ExecExprOp Left, ExecExprOp Right, TokenType Op)
     });
   }
 }
-
-public class ExecExprOpVariable(string Name) : ExecExprOp()
-{
-  public readonly string Name = Name;
-
-  public override ExecResult Value(ExecPathCtx context)
-  {
-    throw new NotImplementedException();
-  }
-}
-
-public class ExecExprOpUserFunc(string Name, ExecExprOp[] Args) : ExecExprOp()
-{
-  public readonly string Name = Name;
-  public readonly ExecExprOp[] Args = Args;
-
-  public override ExecResult Value(ExecPathCtx context)
-  {
-    throw new NotImplementedException();
-  }
-}

@@ -135,7 +135,7 @@ public struct ExecValue(XPValueType type)
     if (double.IsNegativeInfinity(num))
       return "-Infinity";
 
-    return $"{num:f}";
+    return $"{num:0.#################}";
   }
 
   public static string NodeStringValue(XPNodeRef node)

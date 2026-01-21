@@ -7,31 +7,34 @@ namespace XPP.Path;
 
 public class ExecCtxSet
 {
-  public static readonly ExecCtxSet One = new()
+  public static readonly ExecCtxSet One = Constant(1);
+
+  public static ExecCtxSet Constant(int length) => new()
   {
-    length = 1,
-    single = true,
+    length = length,
+    constant = true,
   };
 
   private int length = 0;
-  private bool single = false;
+  private bool constant = false;
   public int Length => length;
 
   public int Add()
   {
-    if (single) return 0;
+    if (constant) return 0;
     return length++;
   }
 
   private ExecCtxSet next = null;
-  public ExecCtxSet Next => single ? One : next ??= new();
+  public ExecCtxSet Next => constant ? this : next ??= new();
 }
 
-public readonly struct ExecPathCtx(XPNavigator Nav, ExecCtxSet Set)
+public readonly struct ExecPathCtx(
+  XPNavigator Nav, ExecCtxSet Set, int? Position = null)
 {
   public readonly XPNavigator Nav = Nav;
   public readonly ExecCtxSet Set = Set;
-  public readonly int Position = Set.Add();
+  public readonly int Position = Position ?? Set.Add();
 }
 
 public abstract class ExecPathOp(ExecPathOp Parent, bool Forward)

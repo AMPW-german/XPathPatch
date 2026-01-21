@@ -106,7 +106,7 @@ public partial struct XPNodeRef
     node != null ? new(Doc, node, version) : Invalid;
 
   public XPType Type => Latest?.Type ?? default;
-  public XPName Name => Latest?.Name ?? default;
+  public XPName Name => Latest?.Name ?? new("", "", "");
   public string Value => Latest?.Value ?? "";
   public int EditVersion => Latest?.DVersion ?? -1;
   public int Depth => Latest?.Depth ?? -1;

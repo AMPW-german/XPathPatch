@@ -52,7 +52,25 @@ public partial class PatchTests : BaseTest
           </Patch>
         """)
       ]),
-    ], "Root/Mod/A", "<A Path='F1.xml'><B C='a' /><B C='b' /></A>")
+    ], "Root/Mod/A", "<A Path='F1.xml'><B C='a' /><B C='b' /></A>"),
+    new([
+      new("Mod1", [
+        new("F1.xml", "<A><B C='1' /></A>"),
+        new("P1.xml", "<Patch><Copy Path='Mod/A/B/@C'>2</Copy></Patch>"),
+      ]),
+    ], "Root/Mod/A/B", "<B C='2' />"),
+    new([
+      new("Mod1", [
+        new("F1.xml", "<A><B C='1' /></A>"),
+        new("P1.xml", """
+          <Patch>
+            <Copy Path='Mod/A/B/@C' From='sum($patch/X/@*)'>
+              <X A='2' B='3' />
+            </Copy>
+          </Patch>
+        """),
+      ]),
+    ], "Root/Mod/A/B", "<B C='5' />"),
   }.Select(p => new object[] { p });
 
   public record class FileCase(string Path, string Xml);

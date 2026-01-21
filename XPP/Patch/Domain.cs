@@ -1,13 +1,15 @@
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml;
 using System.Xml.Serialization;
 using XPP.Doc;
+using XPP.Path;
 
 namespace XPP.Patch;
 
-public class PatchDomain
+public class PatchDomain : IXPathUserContext
 {
   protected virtual string RootElName => "Root";
   protected virtual string ModElName => "Mod";
@@ -17,6 +19,9 @@ public class PatchDomain
   protected virtual XmlSerializer PatchDeserializer =>
     field ??= new(typeof(PatchFile), new XmlRootAttribute(PatchElName));
   public virtual PatchOpDeserializer OpDeserializer => field ??= new();
+
+  private const string PATCH_VAR = "patch";
+  private readonly Dictionary<string, ExecResult> userVars = [];
 
   public readonly XPDocument Doc;
   protected readonly List<PatchMod> mods = [];
@@ -56,6 +61,27 @@ public class PatchDomain
     var mod = new PatchMod(this, id, node);
     mods.Add(mod);
     return mod;
+  }
+
+  public ExecResult ExecXPath(string path, XPNodeRef context, XPNodeRef patch)
+  {
+    userVars[PATCH_VAR] = new(new ExecPathOpNodeList([patch]));
+    return XPath.Exec(path, context, this);
+  }
+
+  public ExecResult GetVariable(string name, ExecPathCtx context)
+  {
+    if (!userVars.TryGetValue(name, out var val))
+      throw new InvalidOperationException($"unknown var {val}");
+
+    if (val.Type is XPValueType.NodeSet)
+      val.NodeSet.Init(context.Nav);
+    return val;
+  }
+
+  public ExecResult CallFunc(string name, ExecPathCtx context, ExecResult[] args)
+  {
+    throw new System.NotImplementedException();
   }
 
   public readonly struct PatchMod(PatchDomain Domain, string Id, XPNodeRef Node)

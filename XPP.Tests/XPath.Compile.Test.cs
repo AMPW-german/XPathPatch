@@ -18,7 +18,7 @@ public partial class XPathTests
   {
     if (err != null)
       throw new InvalidOperationException(err);
-    var xpath = Compiler.Compile(entry.Expr);
+    var xpath = Compiler.Compile(entry.Expr, null);
     var t = new TreeComparer(entry.Expr);
     t.Child("Expr", t => XPathCExpr.TreeCompare(t, entry.Compiled, xpath));
     t.Assert();

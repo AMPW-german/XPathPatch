@@ -5,11 +5,15 @@ using XPP.Doc;
 
 namespace XPP.Path;
 
-public static class Compiler
+public class Compiler
 {
-  public static ExecExprOp Compile(string source) => CompileExpr(Parser.Parse(source));
+  public static ExecExprOp Compile(string source, IXPathUserContext userContext) =>
+    new Compiler(userContext).CompileExpr(Parser.Parse(source));
 
-  private static ExecExprOp CompileExpr(AstNode astNode)
+  private readonly IXPathUserContext userContext;
+  private Compiler(IXPathUserContext userContext) => this.userContext = userContext;
+
+  private ExecExprOp CompileExpr(AstNode astNode)
   {
     switch (astNode.Type)
     {
@@ -19,7 +23,7 @@ public static class Compiler
       case AstType.Value:
         return astNode.Token.Type switch
         {
-          TokenType.VarRef => new ExecExprOpVariable(astNode.Token.String[1..]),
+          TokenType.VarRef => new ExecExprOpVariable(userContext, astNode.Token.String[1..]),
           TokenType.String => new ExecExprOpConstant(new(astNode.Token.String[1..^1])),
           TokenType.Number => new ExecExprOpConstant(
             new(double.Parse(astNode.Token.String))),
@@ -30,7 +34,7 @@ public static class Compiler
         BuildArgList(args, astNode.Child0);
         var func = XPath.ParseLibraryFunc(astNode.Token.String);
         if (func == LibraryFunc.Invalid)
-          return new ExecExprOpUserFunc(astNode.Token.String, [.. args]);
+          return new ExecExprOpUserFunc(userContext, astNode.Token.String, [.. args]);
         return new ExecExprOpFunc(func, [.. args]);
       case AstType.BoolOp:
         return new ExecExprOpLogic(
@@ -49,7 +53,7 @@ public static class Compiler
     }
   }
 
-  private static void BuildArgList(List<ExecExprOp> args, AstNode astNode)
+  private void BuildArgList(List<ExecExprOp> args, AstNode astNode)
   {
     if (astNode is null)
       return;
@@ -73,7 +77,7 @@ public static class Compiler
     public ExecPathOp UnionR;
   }
 
-  private static PathNode BuildPath(AstNode astNode, PathNode prev = null)
+  private PathNode BuildPath(AstNode astNode, PathNode prev = null)
   {
     PathNode usedPrev = null;
     PathNode res = null;
@@ -104,8 +108,8 @@ public static class Compiler
           UnionR = CompilePath(astNode.Child1)
         },
         AstType.BoolOp or AstType.CompareOp or AstType.MathOp
-        or AstType.Negate or AstType.FuncCall or AstType.Value
-        or AstType.ExprFilter => new(astNode) { InExpr = CompileExpr(astNode) },
+        or AstType.Negate or AstType.FuncCall or AstType.Value =>
+          new(astNode) { InExpr = CompileExpr(astNode) },
         _ => throw new InvalidOperationException($"{astNode.Type}"),
       };
     }
@@ -124,7 +128,7 @@ public static class Compiler
     public List<PathNode> Filters;
   }
 
-  private static (PathStep, PathNode) BuildStep(PathNode node)
+  private (PathStep, PathNode) BuildStep(PathNode node)
   {
     var step = new PathStep();
 
@@ -172,7 +176,7 @@ public static class Compiler
     return (step, node);
   }
 
-  private static ExecPathOp CompileStep(PathStep step, ExecPathOp path)
+  private ExecPathOp CompileStep(PathStep step, ExecPathOp path)
   {
     var axis = AxisType.Child;
     switch (step.Axis?.Type)
@@ -214,7 +218,7 @@ public static class Compiler
       case AstType.CompareOp:
       case AstType.MathOp:
       case AstType.Negate:
-        return new ExecPathOpExpr(step.Axis.Expr);
+        return new ExecPathOpExpr(step.Axis.InExpr);
       case null:
         break;
       case AstType.NodeTest:
@@ -236,9 +240,9 @@ public static class Compiler
       case AstType.NodeTest:
         path = step.NodeTest.Token.Type switch
         {
-          TokenType.NodeType =>
-            new ExecPathOpNodeType(path,
-              XPath.ParseNodeType(step.NodeTest.Token.String)),
+          TokenType.NodeType when
+            XPath.ParseNodeType(step.NodeTest.Token.String) is NodeType nodeType =>
+              nodeType is NodeType.Node ? path : new ExecPathOpNodeType(path, nodeType),
           TokenType.NtAny =>
             new ExecPathOpNameTest(path, axis.PrincipalType, "", ""),
           TokenType.NtAnyNs =>
@@ -279,7 +283,7 @@ public static class Compiler
   private static string TokName(Token tok) =>
     tok.String[(tok.String.IndexOf(':') + 1)..];
 
-  private static ExecPathOp CompilePath(AstNode astNode)
+  private ExecPathOp CompilePath(AstNode astNode)
   {
     var node = BuildPath(astNode);
     var steps = new List<PathStep>();
