@@ -170,6 +170,7 @@
       <xs:element name="Parse" type="XPathAst" minOccurs="0" maxOccurs="1" />
       <xs:element name="Compile" type="XPathCExpr" minOccurs="0" maxOccurs="1" />
     </xs:sequence>
+    <xs:attribute name="Id" type="xs:ID" use="required" />
     <xs:attribute name="Expr" type="xs:string" use="required" />
   </xs:complexType>
   <xs:complexType name="XPathTok">

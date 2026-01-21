@@ -10,18 +10,18 @@
         <C />
       </B>
     </A>
-    <Test Path="A/B/C">
+    <Test Id="simple" Path="A/B/C">
       <Match Path="A/B#0/C" />
       <Match Path="A/B#1/C" />
     </Test>
-    <Test Path="A/B/C[1]">
+    <Test Id="simple-axis-index" Path="A/B/C[1]">
       <Match Path="A/B#0/C" />
       <Match Path="A/B#1/C" />
     </Test>
-    <Test Path="(A/B/C)[1]">
+    <Test Id="simple-expr-index" Path="(A/B/C)[1]">
       <Match Path="A/B#0/C" />
     </Test>
-    <Test Path="//*[local-name()='B']">
+    <Test Id="filter-local-name" Path="//*[local-name()='B']">
       <Match Path="A/B#0" />
       <Match Path="A/B#1" />
     </Test>
@@ -39,10 +39,10 @@
         <C V="6" />
       </B>
     </A>
-    <Test Path="A/B[sum(C/@V)=6]">
+    <Test Id="filter-childsum-1" Path="A/B[sum(C/@V)=6]">
       <Match Path="A/B#0" />
     </Test>
-    <Test Path="A/B[sum(C/@V)=15]">
+    <Test Id="filter-childsum-2" Path="A/B[sum(C/@V)=15]">
       <Match Path="A/B#1" />
     </Test>
   </Entry>

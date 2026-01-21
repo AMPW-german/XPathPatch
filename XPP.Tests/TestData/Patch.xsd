@@ -6,6 +6,7 @@
       <xs:element name="Expected" type="PatchExpected" minOccurs="0" maxOccurs="unbounded" />
       <xs:element name="Action" type="PatchAction" minOccurs="0" />
     </xs:sequence>
+    <xs:attribute name="Id" type="xs:ID" use="required" />
   </xs:complexType>
   <xs:complexType name="PatchMod">
     <xs:sequence>

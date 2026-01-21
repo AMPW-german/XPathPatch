@@ -11,7 +11,8 @@ public partial class XPathTests
     DataLoader<XPathEntry>.LoadFilter("XPath.xml", e => e.Tokens.Count > 0);
 
   [TestMethod]
-  [DynamicData(nameof(LoadTokenizeTests))]
+  [DynamicData(nameof(LoadTokenizeTests),
+    DynamicDataDisplayName = nameof(XPathTestDisplayName))]
   public void TestTokenize(XPathEntry entry, Exception ex = null)
   {
     if (ex != null)

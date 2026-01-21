@@ -13,7 +13,8 @@ public partial class XPathTests
     DataLoader<XPathEntry>.LoadFilter("Xpath.xml", e => e.Compiled != null);
 
   [TestMethod]
-  [DynamicData(nameof(LoadCompileTests))]
+  [DynamicData(nameof(LoadCompileTests),
+    DynamicDataDisplayName = nameof(XPathTestDisplayName))]
   public void TestCompile(XPathEntry entry, string err = null)
   {
     if (err != null)

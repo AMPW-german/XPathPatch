@@ -34,14 +34,14 @@ public partial class XPathTests
     }
   }
 
-  public static string ExecNodeDisplayName(MethodInfo method, object[] args) =>
-    $"{method.Name}({(args[1] as XPathExecTest)?.Path ?? "ERROR"})";
+  public static string TestExecNodeDisplayName(MethodInfo method, object[] args) =>
+    $"{method.Name}:{(args[1] as XPathExecTest)?.Id ?? "ERROR"}";
 
   [TestMethod]
   [DynamicData(nameof(LoadExecTests), ["XPath.Exec.xml"],
-    DynamicDataDisplayName = nameof(ExecNodeDisplayName))]
+    DynamicDataDisplayName = nameof(TestExecNodeDisplayName))]
   [DynamicData(nameof(LoadExecTests), ["XPath.Axis.xml"],
-    DynamicDataDisplayName = nameof(ExecNodeDisplayName))]
+    DynamicDataDisplayName = nameof(TestExecNodeDisplayName))]
   public void TestExecNode(XmlElement srcDoc, XPathExecTest test, Exception ex = null)
   {
     if (ex != null)

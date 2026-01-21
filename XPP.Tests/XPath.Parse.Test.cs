@@ -11,7 +11,8 @@ public partial class XPathTests
     DataLoader<XPathEntry>.LoadFilter("Xpath.xml", e => e.Parsed != null);
 
   [TestMethod]
-  [DynamicData(nameof(LoadParseTests))]
+  [DynamicData(nameof(LoadParseTests),
+    DynamicDataDisplayName = nameof(XPathTestDisplayName))]
   public void TestParse(XPathEntry entry, string err = null)
   {
     if (err != null)

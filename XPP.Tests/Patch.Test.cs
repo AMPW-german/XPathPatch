@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Xml;
 using System.Xml.Serialization;
 using XPP.Doc;
@@ -15,8 +16,12 @@ public partial class PatchTests : BaseTest
   public static IEnumerable<object[]> LoadResultTests() =>
     DataLoader<PatchEntry>.LoadFilter("Patch.xml", e => e.Expected.Count > 0);
 
+  public static string PatchTestDisplayName(MethodInfo method, object[] args) =>
+    $"{method.Name}:{(args[0] as PatchEntry)?.Id ?? "ERROR"}";
+
   [TestMethod]
-  [DynamicData(nameof(LoadResultTests))]
+  [DynamicData(nameof(LoadResultTests),
+    DynamicDataDisplayName = nameof(PatchTestDisplayName))]
   public void TestPatchResult(PatchEntry entry, Exception err = null)
   {
     if (err != null)
@@ -50,6 +55,7 @@ public partial class PatchTests : BaseTest
 
 public class PatchEntry
 {
+  [XmlAttribute("Id")] public string Id;
   [XmlElement("Mod")] public List<PatchEntryMod> Mods;
   [XmlElement("Expected")] public List<PatchEntryExpected> Expected;
   [XmlElement("Action")] public PatchEntryAction Action;

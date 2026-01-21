@@ -13,12 +13,13 @@ using Path = BaseTest.Path;
 
 public partial class PatchTests
 {
-  private static IEnumerable<object[]> LoadLogTests() =>
+  private static IEnumerable<object[]> LoadPatchLogTests() =>
     DataLoader<PatchEntry>.LoadFilter("Patch.xml", e => e.Action != null);
 
   [TestMethod]
-  [DynamicData(nameof(LoadLogTests))]
-  public void TestLog(PatchEntry entry, Exception err = null)
+  [DynamicData(nameof(LoadPatchLogTests),
+    DynamicDataDisplayName = nameof(PatchTestDisplayName))]
+  public void TestPatchLog(PatchEntry entry, Exception err = null)
   {
     if (err != null)
       throw err;

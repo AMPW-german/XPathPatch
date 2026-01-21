@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <TestData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:noNamespaceSchemaLocation="XPath.xsd">
-  <Entry Expr="A/B/*">
+  <Entry Id="simple" Expr="A/B/*">
     <Tokenize>
       <Tok T="NtName" V="A" />
       <Tok T="OpSep" V="/" />
@@ -26,7 +26,7 @@
       <Path T="NameTest" Ns="" N="" />
     </Compile>
   </Entry>
-  <Entry Expr="(A/B)[1]/@*">
+  <Entry Id="expr-filter-path" Expr="(A/B)[1]/@*">
     <Tokenize>
       <Tok T="POpen" V="(" />
       <Tok T="NtName" V="A" />
@@ -69,7 +69,7 @@
       <Path T="NameTest" Ns="" N="" Pt="Attribute" />
     </Compile>
   </Entry>
-  <Entry Expr="(A/B)[@*][1]">
+  <Entry Id="expr-filter-multi" Expr="(A/B)[@*][1]">
     <Tokenize>
       <Tok T="POpen" V="(" />
       <Tok T="NtName" V="A" />
@@ -122,7 +122,7 @@
       </Path>
     </Compile>
   </Entry>
-  <Entry Expr="A/B[1]/@*">
+  <Entry Id="simple-index-filter" Expr="A/B[1]/@*">
     <Tokenize>
       <Tok T="NtName" V="A" />
       <Tok T="OpSep" V="/" />
@@ -159,7 +159,7 @@
       <Path T="NameTest" Ns="" N="" Pt="Attribute" />
     </Compile>
   </Entry>
-  <Entry Expr="A/child::B[1]/@*">
+  <Entry Id="simple-axis-index-filter" Expr="A/child::B[1]/@*">
     <Tokenize>
       <Tok T="NtName" V="A" />
       <Tok T="OpSep" V="/" />
@@ -200,7 +200,7 @@
       <Path T="NameTest" Ns="" N="" Pt="Attribute" />
     </Compile>
   </Entry>
-  <Entry Expr="A/B[sum(C/@V)=15]">
+  <Entry Id="filter-func-expr" Expr="A/B[sum(C/@V)=15]">
     <Tokenize>
       <Tok T="NtName" V="A" />
       <Tok T="OpSep" V="/" />
@@ -256,7 +256,7 @@
       </Path>
     </Compile>
   </Entry>
-  <Entry Expr="//B/preceding::*//*">
+  <Entry Id="multi-axis-reverse-order" Expr="//B/preceding::*//*">
     <Tokenize>
       <Tok T="OpSepDesc" V="//" />
       <Tok T="NtName" V="B" />
@@ -283,7 +283,7 @@
       <Path T="NameTest" Ns="" N="" />
     </Compile>
   </Entry>
-  <Entry Expr=".=1">
+  <Entry Id="simple-compare-expr" Expr=".=1">
     <Tokenize>
       <Tok T="Self" V="." />
       <Tok T="OpEq" V="=" />
@@ -296,7 +296,7 @@
       <R T="Constant" Num="1" />
     </Compile>
   </Entry>
-  <Entry Expr="A/B[3]/C[2]/preceding::*">
+  <Entry Id="axis-reverse-final" Expr="A/B[3]/C[2]/preceding::*">
     <Compile T="Path">
       <Path T="Context" />
       <Path T="Axis" Ax="Child" />
@@ -318,7 +318,7 @@
       <Path T="Reverse" />
     </Compile>
   </Entry>
-  <Entry Expr="(//* | //@*)">
+  <Entry Id="simple-union" Expr="(//* | //@*)">
     <Tokenize>
       <Tok T="POpen" V="(" />
       <Tok T="OpSepDesc" V="//" />

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <TestData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:noNamespaceSchemaLocation="Patch.xsd">
-  <Entry>
+  <Entry Id="copy-literal-to-attr">
     <Mod Id="Mod1">
       <File Path="F1.xml">
         <A>
@@ -31,7 +31,7 @@
       </Action>
     </Action>
   </Entry>
-  <Entry>
+  <Entry Id="merge-attr-insert">
     <Mod Id="Mod1">
       <File Path="F1.xml">
         <A>
@@ -70,7 +70,7 @@
       </Action>
     </Action>
   </Entry>
-  <Entry>
+  <Entry Id="delete-attr">
     <Mod Id="Mod1">
       <File Path="F1.xml">
         <A>
@@ -87,7 +87,7 @@
       <B />
     </Expected>
   </Entry>
-  <Entry>
+  <Entry Id="copy-attr-literal-with-ifelse">
     <Mod Id="Mod1">
       <File Path="F1.xml">
         <A>
@@ -117,7 +117,7 @@
       </A>
     </Expected>
   </Entry>
-  <Entry>
+  <Entry Id="copy-attr-expr-patchvar">
     <Mod Id="Mod1">
       <File Path="F1.xml">
         <A>
@@ -136,7 +136,7 @@
       <B C="5" />
     </Expected>
   </Entry>
-  <Entry>
+  <Entry Id="setvar-value-copy-attr-var">
     <Mod Id="Mod1">
       <File Path="F1.xml">
         <A>

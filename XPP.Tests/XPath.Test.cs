@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using System.Xml;
 using System.Xml.Serialization;
 using XPP.Doc;
@@ -7,10 +8,15 @@ using XPP.Path;
 namespace XPP.Tests;
 
 [TestClass]
-public partial class XPathTests : BaseTest;
+public partial class XPathTests : BaseTest
+{
+  public static string XPathTestDisplayName(MethodInfo method, object[] args) =>
+    $"{method.Name}:{(args[0] as XPathEntry)?.Id ?? "ERROR"}";
+}
 
 public class XPathEntry
 {
+  [XmlAttribute("Id")] public string Id;
   [XmlAttribute("Expr")] public string Expr;
   [XmlArray("Tokenize"), XmlArrayItem("Tok")] public List<XPathTok> Tokens;
   [XmlElement("Parse")] public XPathAst Parsed;
@@ -76,6 +82,7 @@ public partial class XPathExecEntry
 
 public partial class XPathExecTest
 {
+  [XmlAttribute("Id")] public string Id;
   [XmlAttribute("Path")] public string Path;
   [XmlElement("Match")] public List<XPathExecMatch> Matches = [];
 

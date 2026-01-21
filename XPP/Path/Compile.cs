@@ -85,7 +85,9 @@ public class Compiler
     {
       return res = astNode.Type switch
       {
-        AstType.Root => BuildPath(astNode.Left, new(astNode)),
+        AstType.Root => astNode.Left != null
+          ? BuildPath(astNode.Left, new(astNode))
+          : new(astNode),
         AstType.Sep => BuildPath(astNode.Right,
           new(astNode, BuildPath(astNode.Left, usedPrev = prev))),
         AstType.Axis => astNode.Token.Type switch
