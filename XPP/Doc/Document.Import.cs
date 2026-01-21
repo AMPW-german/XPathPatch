@@ -13,7 +13,8 @@ public partial class XPDocument
       case XmlNodeType.Element when node is XmlElement el:
         return ImportElement(el, parent);
       case XmlNodeType.Attribute when node is XmlAttribute attr:
-        return AddChild(parent, attr.Prefix == XMLNS_PREFIX ? XPType.Namespace : XPType.Attribute,
+        return AddChild(parent,
+          PrefixedName(node).IsNamespace ? XPType.Namespace : XPType.Attribute,
           prefixedName: PrefixedName(node), value: attr.Value);
       case XmlNodeType.Text:
         return AddChild(parent, XPType.Text, value: node.Value);
@@ -74,7 +75,7 @@ public partial class XPDocument
         return ImportElement(reader, parent);
       case XmlNodeType.Attribute:
         return AddChild(parent,
-          reader.Prefix == XMLNS_PREFIX ? XPType.Namespace : XPType.Attribute,
+          PrefixedName(reader).IsNamespace ? XPType.Namespace : XPType.Attribute,
           prefixedName: PrefixedName(reader), value: reader.Value);
       case XmlNodeType.Text:
         return AddChild(parent, XPType.Text, value: reader.Value);

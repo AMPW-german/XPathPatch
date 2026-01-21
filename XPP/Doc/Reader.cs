@@ -89,7 +89,7 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
   {
     XPName.Parts(name, out var prefix, out var local);
     var attr = state.FirstAttr();
-    var isNs = prefix == XPDocument.XMLNS_PREFIX;
+    var isNs = prefix.SequenceEqual(XPName.XMLNS_PREFIX);
     while (attr.Valid)
     {
       var aname = attr.Node.Name;
@@ -129,9 +129,9 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
 
   public override string LookupNamespace(string prefix) => nt.Add(prefix switch
   {
-    // TODO: xml prefix uri
-    "" or "xml" => prefix,
-    XPDocument.XMLNS_PREFIX => XPDocument.XMLNS_URI,
+    "" => prefix,
+    XPName.XML_PREFIX => XPName.XML_URI,
+    XPName.XMLNS_PREFIX => XPName.XMLNS_URI,
     _ when state.Node.ResolveName(prefix, "", out var name) => name.NsUri,
     _ => null,
   });

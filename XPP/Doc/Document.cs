@@ -7,9 +7,6 @@ namespace XPP.Doc;
 
 public partial class XPDocument
 {
-  public const string XMLNS_PREFIX = "xmlns";
-  public const string XMLNS_URI = "http://www.w3.org/2000/xmlns/";
-
   private readonly List<Node> roots = [];
   public readonly OrderTree otree = new();
   private int docVersion = 0;
@@ -39,9 +36,14 @@ public partial class XPDocument
       resolved = new("", "", name);
       return true;
     }
-    if (prefix.SequenceEqual(XMLNS_PREFIX))
+    if (prefix.SequenceEqual(XPName.XMLNS_PREFIX))
     {
-      resolved = new(XMLNS_URI, XMLNS_PREFIX, new(local));
+      resolved = XPName.NsName(new(local));
+      return true;
+    }
+    else if (prefix.SequenceEqual(XPName.XML_PREFIX))
+    {
+      resolved = XPName.XmlName(new(local));
       return true;
     }
 
@@ -50,14 +52,20 @@ public partial class XPDocument
 
   internal static bool ResolveName(VNode vnode, string prefix, string local, out XPName resolved)
   {
+    var prefixed = new XPName("", prefix, local);
     if (prefix == "")
     {
-      resolved = new("", "", local);
+      resolved = prefixed;
       return true;
     }
-    if (prefix == XMLNS_PREFIX)
+    if (prefixed.IsNamespace)
     {
-      resolved = new(XMLNS_URI, XMLNS_PREFIX, local);
+      resolved = XPName.NsName(local);
+      return true;
+    }
+    else if (prefixed.IsXmlAttr)
+    {
+      resolved = XPName.XmlName(local);
       return true;
     }
     var node = vnode.Node;
@@ -164,10 +172,10 @@ public partial class XPDocument
       if (!validName)
         throw new InvalidOperationException($"unknown prefix '{name.Prefix}'");
 
-      if (type is XPType.Namespace && name.Prefix != XMLNS_PREFIX)
-        throw new InvalidOperationException($"Namespace must have {XMLNS_PREFIX} prefix");
-      if (type is XPType.Attribute && name.Prefix == XMLNS_PREFIX)
-        throw new InvalidOperationException($"Attribute must not have prefix {XMLNS_PREFIX}");
+      if (type is XPType.Namespace && !name.IsNamespace)
+        throw new InvalidOperationException($"Namespace must have {XPName.XMLNS_PREFIX} prefix");
+      if (type is XPType.Attribute && name.IsNamespace)
+        throw new InvalidOperationException($"Attribute must not have prefix {XPName.XMLNS_PREFIX}");
     }
     else
       name = new("", "", "");
@@ -423,6 +431,16 @@ public partial class XPDocument
 
 public readonly struct XPName(string NsUri, string Prefix, string Local) : IEquatable<XPName>
 {
+  public const string XMLNS_PREFIX = "xmlns";
+  public const string XMLNS_URI = "http://www.w3.org/2000/xmlns/";
+  public const string XML_PREFIX = "xml";
+  public const string XML_URI = "http://www.w3.org/XML/1998/namespace";
+
+  public static readonly XPName XMLNS_DEFAULT = new("", "", XMLNS_PREFIX);
+
+  public static XPName XmlName(string local) => new(XML_URI, XML_PREFIX, local);
+  public static XPName NsName(string local) => new(XMLNS_URI, XMLNS_PREFIX, local);
+
   public readonly string NsUri = NsUri;
   public readonly string Prefix = Prefix;
   public readonly string Local = Local;
@@ -432,6 +450,9 @@ public readonly struct XPName(string NsUri, string Prefix, string Local) : IEqua
   public override int GetHashCode() => HashCode.Combine(NsUri, Local);
   public static bool operator ==(XPName left, XPName right) => left.Equals(right);
   public static bool operator !=(XPName left, XPName right) => !(left == right);
+
+  public bool IsNamespace => Prefix == XMLNS_PREFIX || this == XMLNS_DEFAULT;
+  public bool IsXmlAttr => Prefix == XML_PREFIX;
 
   public static void Parts(
     string raw, out ReadOnlySpan<char> prefix, out ReadOnlySpan<char> local)

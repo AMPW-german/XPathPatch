@@ -2,7 +2,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace XPP.Utils;
 
@@ -106,35 +105,5 @@ public class AppendList<T> : IEnumerable<T>, IDisposable where T : notnull
     public int Offset => range.off;
     public int Length => range.len;
     public ref T this[Index index] => ref list[range.off + index.GetOffset(range.len)];
-  }
-}
-
-public class PooledAppendList<T>() : AppendList<T> where T : notnull
-{
-  [ThreadStatic]
-  private static Queue<WeakReference<T[]>> Pool;
-
-  private readonly Queue<WeakReference<T[]>> pool = Pool ??= new();
-
-  public override void Dispose()
-  {
-    foreach (var chunk in chunks)
-    {
-      Array.Fill(chunk, default);
-      pool.Enqueue(new(chunk));
-    }
-    chunks.Clear();
-    length = 0;
-  }
-
-  protected override T[] NewChunk()
-  {
-    while (pool.Count > 0)
-    {
-      var cref = pool.Dequeue();
-      if (cref.TryGetTarget(out var chunk))
-        return chunk;
-    }
-    return new T[CHUNK_SIZE];
   }
 }
