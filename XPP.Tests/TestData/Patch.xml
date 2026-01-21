@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation="Patch.xsd">
+  <Entry>
+    <Mod Id="Mod1">
+      <File Path="F1.xml">
+        <A>
+          <B C="v1" />
+        </A>
+      </File>
+      <File Path="P1.xml">
+        <Patch>
+          <Copy Path="Mod/A/B/@C" From="'v2'" />
+        </Patch>
+      </File>
+    </Mod>
+    <Expected Path="Root/Mod/A/B">
+      <B C="v2" />
+    </Expected>
+  </Entry>
+  <Entry>
+    <Mod Id="Mod1">
+      <File Path="F1.xml">
+        <A>
+          <B C="v1" />
+        </A>
+      </File>
+      <File Path="P1.xml">
+        <Patch>
+          <Merge Path="Mod/A" From="Mod/Patch/Merge/A">
+            <A>
+              <B D="E" />
+            </A>
+          </Merge>
+        </Patch>
+      </File>
+    </Mod>
+    <Expected Path="Root/Mod/A/B">
+      <B C="v1" D="E" />
+    </Expected>
+  </Entry>
+  <Entry>
+    <Mod Id="Mod1">
+      <File Path="F1.xml">
+        <A>
+          <B C="v1" />
+        </A>
+      </File>
+      <File Path="P1.xml">
+        <Patch>
+          <Delete Path="Mod/A/B/@C" />
+        </Patch>
+      </File>
+    </Mod>
+    <Expected Path="Root/Mod/A/B">
+      <B />
+    </Expected>
+  </Entry>
+  <Entry>
+    <Mod Id="Mod1">
+      <File Path="F1.xml">
+        <A>
+          <B C="1" />
+          <B C="2" />
+        </A>
+      </File>
+      <File Path="P1.xml">
+        <Patch>
+          <With Path="Mod/A/B/@C">
+            <If Path=".=1">
+              <Any>
+                <Copy From="'a'" />
+              </Any>
+              <None>
+                <Copy From="'b'" />
+              </None>
+            </If>
+          </With>
+        </Patch>
+      </File>
+    </Mod>
+    <Expected Path="Root/Mod/A">
+      <A Path="F1.xml">
+        <B C="a" />
+        <B C="b" />
+      </A>
+    </Expected>
+  </Entry>
+  <Entry>
+    <Mod Id="Mod1">
+      <File Path="F1.xml">
+        <A>
+          <B C="1" />
+        </A>
+      </File>
+      <File Path="P1.xml">
+        <Patch>
+          <Copy Path='Mod/A/B/@C' From='sum($patch/X/@*)'>
+            <X A='2' B='3' />
+          </Copy>
+        </Patch>
+      </File>
+    </Mod>
+    <Expected Path="Root/Mod/A/B">
+      <B C="5" />
+    </Expected>
+  </Entry>
+  <Entry>
+    <Mod Id="Mod1">
+      <File Path="F1.xml">
+        <A>
+          <B C="1" />
+        </A>
+      </File>
+      <File Path="P1.xml">
+        <Patch>
+          <SetVar Name="testvar" Path="sum($patch/X/@*)">
+            <X A="2" B="3" />
+          </SetVar>
+          <SetVar Name="testvar" Path="$testvar*2" />
+          <Copy Path="Mod/A/B/@C" From="$testvar" />
+        </Patch>
+      </File>
+    </Mod>
+    <Expected Path="Root/Mod/A/B">
+      <B C="10" />
+    </Expected>
+  </Entry>
+</TestData>
