@@ -238,6 +238,28 @@ public class TreeComparer(string title)
   public TreeComparer Compare<T>(string name, bool match, T expected, T actual) =>
     Compare(name, match, $"{expected}", $"{actual}");
 
+  public TreeComparer Compare<E, A>(
+    string name, List<E> expected, List<A> actual,
+    Action<TreeComparer, int, E, A> f, bool omitMatch = false
+  ) => Child(name, t =>
+    {
+      t.Compare("Length", expected.Count == actual.Count, expected.Count, actual.Count);
+      for (var i = 0; i < expected.Count || i < actual.Count; i++)
+      {
+        var eval = i < expected.Count ? expected[i] : default;
+        var aval = i < actual.Count ? actual[i] : default;
+        f(this, i, eval, aval);
+      }
+    }, omitMatch);
+
+  public TreeComparer Compare<T>(
+    string name, List<T> expected, List<T> actual, bool omitMatch = false
+  ) => Compare(name, expected, actual, (t, i, eval, aval) =>
+  {
+    var eq = eval?.Equals(aval) ?? aval.Equals(eval);
+    t.Compare($"{i:00}", eq, eval, aval);
+  }, omitMatch);
+
   public TreeComparer CmpThrow(string name, bool match, string expected, string actual)
   {
     Compare(name, match, expected, actual);

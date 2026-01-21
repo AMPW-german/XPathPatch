@@ -4,6 +4,7 @@
     <xs:sequence>
       <xs:element name="Mod" type="PatchMod" maxOccurs="unbounded" />
       <xs:element name="Expected" type="PatchExpected" minOccurs="0" maxOccurs="unbounded" />
+      <xs:element name="Action" type="PatchAction" minOccurs="0" />
     </xs:sequence>
   </xs:complexType>
   <xs:complexType name="PatchMod">
@@ -23,6 +24,67 @@
       <xs:any processContents="skip" />
     </xs:sequence>
     <xs:attribute name="Path" type="xs:string" use="required" />
+  </xs:complexType>
+  <xs:simpleType name="ActionType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Root" />
+      <xs:enumeration value="OpPatch" />
+      <xs:enumeration value="OpCopy" />
+      <xs:enumeration value="OpMerge" />
+      <xs:enumeration value="OpDelete" />
+      <xs:enumeration value="OpIf" />
+      <xs:enumeration value="OpIfAny" />
+      <xs:enumeration value="OpIfNone" />
+      <xs:enumeration value="OpWith" />
+      <xs:enumeration value="OpSetVar" />
+      <xs:enumeration value="WithCtx" />
+      <xs:enumeration value="Insert" />
+      <xs:enumeration value="InsertText" />
+      <xs:enumeration value="Set" />
+      <xs:enumeration value="Remove" />
+      <xs:enumeration value="Merge" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="PatchPosition">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Replace" />
+      <xs:enumeration value="Append" />
+      <xs:enumeration value="Prepend" />
+      <xs:enumeration value="Before" />
+      <xs:enumeration value="After" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="PatchAction">
+    <xs:sequence>
+      <xs:element name="Target" type="PatchValue" minOccurs="0" />
+      <xs:element name="Source" type="PatchValue" minOccurs="0" />
+      <xs:element name="Action" type="PatchAction" minOccurs="0" maxOccurs="unbounded" />
+    </xs:sequence>
+    <xs:attribute name="Type" type="ActionType" use="required" />
+    <xs:attribute name="Target" type="xs:string" />
+    <xs:attribute name="Source" type="xs:string" />
+    <xs:attribute name="Pos" type="PatchPosition" />
+  </xs:complexType>
+  <xs:simpleType name="ValueType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Bool" />
+      <xs:enumeration value="Number" />
+      <xs:enumeration value="String" />
+      <xs:enumeration value="NodeSet" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="PatchValue">
+    <xs:sequence>
+      <xs:element name="Node" minOccurs="0">
+        <xs:complexType>
+          <xs:attribute name="Path" type="xs:string" use="required" />
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="Type" type="ValueType" use="required" />
+    <xs:attribute name="Bool" type="xs:boolean" />
+    <xs:attribute name="Number" type="xs:double" />
+    <xs:attribute name="String" type="xs:string" />
   </xs:complexType>
   <xs:element name="TestData">
     <xs:complexType>

@@ -1,26 +1,26 @@
 
+using System;
 using System.Collections.Generic;
 using System.Xml;
 using System.Xml.Serialization;
 using XPP.Doc;
 using XPP.Patch;
+using XPP.Path;
 
 namespace XPP.Tests;
 
 [TestClass]
 public partial class PatchTests : BaseTest
 {
-  public record class FileCase(string Path, string Xml);
-  public record class ModCase(string Id, FileCase[] Files);
-  public record class ResultCase(ModCase[] Mods, Path ExpPath, string Expected);
-
   public static IEnumerable<object[]> LoadResultTests() =>
     DataLoader<PatchEntry>.LoadFilter("Patch.xml", e => e.Expected.Count > 0);
 
   [TestMethod]
   [DynamicData(nameof(LoadResultTests))]
-  public void TestPatchResult(PatchEntry entry)
+  public void TestPatchResult(PatchEntry entry, Exception err = null)
   {
+    if (err != null)
+      throw err;
     var domain = new PatchDomain();
     foreach (var pmod in entry.Mods)
     {
@@ -52,6 +52,7 @@ public class PatchEntry
 {
   [XmlElement("Mod")] public List<PatchEntryMod> Mods;
   [XmlElement("Expected")] public List<PatchEntryExpected> Expected;
+  [XmlElement("Action")] public PatchEntryAction Action;
 }
 
 public class PatchEntryMod
@@ -70,4 +71,30 @@ public class PatchEntryExpected
 {
   [XmlAttribute("Path")] public string Path;
   [XmlAnyElement] public XmlElement Content;
+}
+
+public partial class PatchEntryAction
+{
+  [XmlAttribute("Type")] public ActionType Type;
+  [XmlAttribute("Target")] public string Target;
+  [XmlAttribute("Source")] public string Source;
+  [XmlAttribute("Pos")] public PatchPosition Pos = PatchPosition.Unset;
+
+  [XmlElement("Target")] public PatchEntryValue TargetResult;
+  [XmlElement("Source")] public PatchEntryValue SourceResult;
+  [XmlElement("Action")] public List<PatchEntryAction> Children;
+}
+
+public class PatchEntryValue
+{
+  [XmlAttribute("Type")] public XPValueType Type;
+  [XmlAttribute("Bool")] public bool Bool;
+  [XmlAttribute("Number")] public double Number;
+  [XmlAttribute("String")] public string String;
+  [XmlElement("Node")] public List<PatchEntryNode> Nodes;
+}
+
+public class PatchEntryNode
+{
+  [XmlAttribute("Path")] public string Path;
 }

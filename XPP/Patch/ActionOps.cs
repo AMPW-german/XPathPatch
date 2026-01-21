@@ -36,6 +36,7 @@ public enum ActionType
 
 public enum PatchPosition
 {
+  Unset = -1,
   Replace,
   Append,
   Prepend,

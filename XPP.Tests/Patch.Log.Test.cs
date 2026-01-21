@@ -2,145 +2,109 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Xml;
 using XPP.Doc;
 using XPP.Patch;
 using XPP.Path;
 
 namespace XPP.Tests;
 
+using Path = BaseTest.Path;
+
 public partial class PatchTests
 {
-  private static IEnumerable<object[]> LogCases => new List<LogCase>()
-  {
-    new([
-      new("Mod1", [
-        new("F1.xml", "<A><B C='V2' /></A>"),
-        new("P1.xml", "<Patch><Copy Path='Mod/A/B/@C' From='\"v2\"' /></Patch>"),
-      ]),
-    ], new(ActionType.Root, Children: [
-      new(ActionType.OpPatch, Target: "Root/Mod/Patch", Children: [
-        new(ActionType.OpCopy, Target: "Root/Mod/Patch/Copy",
-            TargetResults: [(Path)"Root/Mod/A/B/@C"], SourceResults: ["v2"], Children: [
-          new(ActionType.Set, Target: "Root/Mod/A/B/@C", SourceResults: ["v2"])
-        ])
-      ])
-    ])),
-    new([
-      new("Mod1", [
-        new("F1.xml", "<A><B C='v1' /></A>"),
-        new("P1.xml", """
-          <Patch>
-            <Merge Path='Mod/A' From='Mod/Patch/Merge/A'>
-              <A><B D='E'/></A>
-            </Merge>
-          </Patch>
-        """)
-      ]),
-    ], new ActionCase(ActionType.Root, Children: [
-      new(ActionType.OpPatch, Target: "Root/Mod/Patch", Children: [
-        new(ActionType.OpMerge, Target: "Root/Mod/Patch/Merge",
-          TargetResults: [(Path)"Root/Mod/A"],
-          SourceResults: [(Path)"Root/Mod/Patch/Merge/A"], Children:
-        [
-          new(ActionType.Merge, Target: "Root/Mod/A", Source: "Root/Mod/Patch/Merge/A", Children: [
-            new(ActionType.Merge, Target: "Root/Mod/A/B", Source: "Root/Mod/Patch/Merge/A/B", Children: [
-              new(ActionType.Insert, Target: "Root/Mod/A/B",
-                Source: "Root/Mod/Patch/Merge/A/B/@D", Pos: PatchPosition.Append)
-            ])
-          ])
-        ])
-      ])
-    ])),
-  }.Select(c => new object[] { c });
-
-  public record class LogCase(ModCase[] Mods, ActionCase Action);
-  public record class ActionCase(
-    ActionType Type,
-    Path Target = null, Path Source = null, PatchPosition? Pos = null,
-    object[] TargetResults = null, object[] SourceResults = null,
-    ActionCase[] Children = null)
-  {
-    public static void Equals(
-      TreeComparer t, ActionCase expected, PatchAction actual)
-    {
-      if (expected == null && actual == null)
-        return;
-      expected ??= new(ActionType.Invalid);
-      var atgt = Path.FromNode(actual?.Target ?? XPNodeRef.Invalid);
-      var asrc = Path.FromNode(actual?.Source ?? XPNodeRef.Invalid);
-      t.Compare("Type", expected.Type == actual?.Type, expected.Type, actual?.Type);
-      if (expected.Target != null)
-        t.Compare("Target", expected.Target.Equals(atgt), expected.Target, atgt);
-      else
-        t.Add($"Target = {atgt}");
-      if (expected.Source != null)
-        t.Compare("Source", expected.Source.Equals(asrc), expected.Source, asrc);
-      if (expected.Pos != null)
-        t.Compare("Pos", expected.Pos == actual?.Position, expected.Pos, actual?.Position);
-      if (expected.TargetResults != null)
-        t.Child("TargetResults", t => CompareResults(t, expected.TargetResults,
-          [.. actual?.TargetResult ?? []]), true);
-      if (expected.SourceResults != null)
-        t.Child("SourceResults", t => CompareResults(t, expected.SourceResults,
-          [.. actual?.SourceResult ?? []]), true);
-
-      var echildren = expected.Children ?? [];
-      var achildren = actual?.Children ?? [];
-      for (var index = 0; index < echildren.Length || index < achildren.Count; index++)
-      {
-        var echild = index < echildren.Length ? echildren[index] : null;
-        var achild = index < achildren.Count ? achildren[index] : null;
-        t.Child($"Child {index}", t => Equals(t, echild, achild), false);
-      }
-    }
-
-    private static object Obj(ExecValue val) => val.Type switch
-    {
-      XPValueType.Bool => val.Bool,
-      XPValueType.Number => val.Number,
-      XPValueType.String => val.String,
-      XPValueType.NodeSet => Path.FromNode(val.Node),
-      _ => throw new InvalidOperationException($"{val.Type}"),
-    };
-
-    private static void CompareResults(
-      TreeComparer t, object[] expected, ExecValue[] actual)
-    {
-      for (var i = 0; i < expected.Length || i < actual.Length; i++)
-      {
-        var e = i < expected.Length ? expected[i] : null;
-        var a = i < actual.Length ? actual[i] : default(ExecValue?);
-        if (e == null && a == null)
-          continue;
-        if (e == null)
-          t.Compare($"{i}", false, "<null>", $"{a.Value.Type} {Obj(a.Value)}");
-        else if (a == null)
-          t.Compare($"{i}", false, $"{e.GetType().Name} {e}", "<null>");
-        else
-        {
-          var aobj = Obj(a.Value);
-          t.Compare($"{i}", e.Equals(aobj), $"{e.GetType().Name} {e}", $"{a.Value.Type} {aobj}");
-        }
-      }
-    }
-  }
+  private static IEnumerable<object[]> LoadLogTests() =>
+    DataLoader<PatchEntry>.LoadFilter("Patch.xml", e => e.Action != null);
 
   [TestMethod]
-  [DynamicData(nameof(LogCases))]
-  public void TestLog(LogCase pcase)
+  [DynamicData(nameof(LoadLogTests))]
+  public void TestLog(PatchEntry entry, Exception err = null)
   {
+    if (err != null)
+      throw err;
     var domain = new PatchDomain();
-    foreach (var pmod in pcase.Mods)
+    foreach (var pmod in entry.Mods)
     {
       var mod = domain.AddMod(pmod.Id);
       foreach (var f in pmod.Files)
-        mod.ImportXml(f.Path, f.Xml);
+        mod.Import(f.Path, new XmlNodeReader(f.Content));
     }
     var exec = new PatchExecutor(domain);
     exec.StepToEnd();
 
     var t = new TreeComparer("");
-    ActionCase.Equals(t, pcase.Action, exec.Root);
+    PatchEntryAction.TreeCompare(t, entry.Action, exec.Root);
     t.Assert();
   }
+}
+
+public partial class PatchEntryAction
+{
+  public static void TreeCompare(
+    TreeComparer t, PatchEntryAction expected, PatchAction actual)
+  {
+    if (expected == null && actual == null)
+      return;
+    expected ??= new() { Type = ActionType.Invalid };
+    var atgt = Path.FromNode(actual?.Target ?? XPNodeRef.Invalid);
+    var asrc = Path.FromNode(actual?.Source ?? XPNodeRef.Invalid);
+    t.Compare("Type", expected.Type == actual?.Type, expected.Type, actual?.Type);
+    if (expected.Target != null)
+      t.Compare("Target", atgt.Equals((Path)expected.Target), expected.Target, atgt);
+    else
+      t.Add($"Target = {atgt}");
+    if (expected.Source != null)
+      t.Compare("Source", asrc.Equals((Path)expected.Source), expected.Source, asrc);
+    if (expected.Pos != PatchPosition.Unset)
+      t.Compare("Pos", expected.Pos == actual?.Position, expected.Pos, actual?.Position);
+    if (expected.TargetResult != null)
+      t.Child("TargetResults", t => CompareResults(t, expected.TargetResult,
+        [.. actual?.TargetResult ?? []]), true);
+    if (expected.SourceResult != null)
+      t.Child("SourceResults", t => CompareResults(t, expected.SourceResult,
+        [.. actual?.SourceResult ?? []]), true);
+
+    t.Compare(
+      "Children", expected.Children ?? [], actual?.Children ?? [],
+      (t, i, e, a) => t.Child($"{i:00}", t => TreeCompare(t, e, a)), true);
+  }
+
+  private static void CompareResults(
+    TreeComparer t, PatchEntryValue expected, ExecValue[] actual)
+  {
+    if (expected.Type != XPValueType.NodeSet)
+    {
+      t.CmpThrow("Length", actual.Length == 1, 1, actual.Length);
+      var aval = actual[0];
+      t.CmpThrow("Type", expected.Type == aval.Type, expected.Type, aval.Type);
+      switch (expected.Type)
+      {
+        case XPValueType.Bool:
+          t.Compare("Bool", expected.Bool == aval.Bool, expected.Bool, aval.Bool);
+          break;
+        case XPValueType.Number:
+          t.Compare(
+            "Number", expected.Number == aval.Number, expected.Number, aval.Number);
+          break;
+        case XPValueType.String:
+          t.Compare(
+            "String", expected.String == aval.String, expected.String, aval.String);
+          break;
+        default: throw new InvalidOperationException($"{expected.Type}");
+      }
+      return;
+    }
+    var epaths = expected.Nodes.Select(n => (Path)n.Path).ToList();
+    var apaths = actual.Select(n => Path.FromNode(n.Node)).ToList();
+    t.Compare("Nodes", epaths, apaths);
+  }
+
+  private static object Obj(ExecValue val) => val.Type switch
+  {
+    XPValueType.Bool => val.Bool,
+    XPValueType.Number => val.Number,
+    XPValueType.String => val.String,
+    XPValueType.NodeSet => Path.FromNode(val.Node),
+    _ => throw new InvalidOperationException($"{val.Type}"),
+  };
 }

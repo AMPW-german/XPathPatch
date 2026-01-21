@@ -17,6 +17,19 @@
     <Expected Path="Root/Mod/A/B">
       <B C="v2" />
     </Expected>
+    <Action Type="Root">
+      <Action Type="OpPatch" Target="Root/Mod/Patch">
+        <Action Type="OpCopy" Target="Root/Mod/Patch/Copy">
+          <Target Type="NodeSet">
+            <Node Path="Root/Mod/A/B/@C" />
+          </Target>
+          <Source Type="String" String="v2" />
+          <Action Type="Set" Target="Root/Mod/A/B/@C">
+            <Source Type="String" String="v2" />
+          </Action>
+        </Action>
+      </Action>
+    </Action>
   </Entry>
   <Entry>
     <Mod Id="Mod1">
@@ -38,6 +51,24 @@
     <Expected Path="Root/Mod/A/B">
       <B C="v1" D="E" />
     </Expected>
+    <Action Type="Root">
+      <Action Type="OpPatch" Target="Root/Mod/Patch">
+        <Action Type="OpMerge" Target="Root/Mod/Patch/Merge">
+          <Target Type="NodeSet">
+            <Node Path="Root/Mod/A" />
+          </Target>
+          <Source Type="NodeSet">
+            <Node Path="Root/Mod/Patch/Merge/A" />
+          </Source>
+          <Action Type="Merge" Target="Root/Mod/A" Source="Root/Mod/Patch/Merge/A">
+            <Action Type="Merge" Target="Root/Mod/A/B" Source="Root/Mod/Patch/Merge/A/B">
+              <Action Type="Insert" Target="Root/Mod/A/B"
+                Source="Root/Mod/Patch/Merge/A/B/@D" Pos="Append" />
+            </Action>
+          </Action>
+        </Action>
+      </Action>
+    </Action>
   </Entry>
   <Entry>
     <Mod Id="Mod1">
