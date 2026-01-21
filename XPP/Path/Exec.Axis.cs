@@ -8,6 +8,24 @@ namespace XPP.Path;
 public abstract class ExecPathOpAxis(ExecPathOp Parent, AxisType Type)
   : ExecPathOp(Parent, Type.IsForward)
 {
+  public static ExecPathOp Make(ExecPathOp parent, AxisType axis) => axis switch
+  {
+    AxisType.Ancestor => new ExecPathOpAxisAncestor(parent),
+    AxisType.AncestorOrSelf => new ExecPathOpAxisAncestorOrSelf(parent),
+    AxisType.Attribute => new ExecPathOpAxisAttribute(parent),
+    AxisType.Child => new ExecPathOpAxisChild(parent),
+    AxisType.Descendant => new ExecPathOpAxisDescendant(parent),
+    AxisType.DescendantOrSelf => new ExecPathOpAxisDescendantOrSelf(parent),
+    AxisType.Following => new ExecPathOpAxisFollowing(parent),
+    AxisType.FollowingSibling => new ExecPathOpAxisFollowingSibling(parent),
+    AxisType.Namespace => new ExecPathOpAxisNamespace(parent),
+    AxisType.Parent => new ExecPathOpAxisParent(parent),
+    AxisType.Preceding => new ExecPathOpAxisPreceding(parent),
+    AxisType.PrecedingSibling => new ExecPathOpAxisPrecedingSibling(parent),
+    AxisType.Self => new ExecPathOpAxisSelf(parent),
+    _ => throw new InvalidOperationException($"{axis}"),
+  };
+
   public readonly AxisType Type = Type;
 
   protected enum AxPreState { PrevSib, LastChild, Parent }
@@ -61,8 +79,7 @@ public abstract class ExecPathOpAxis(ExecPathOp Parent, AxisType Type)
       return false;
     }
 
-    next = new(nextState.Cur, nextState.Set, nextState.Set.Length);
-    nextState.Set.Length++;
+    next = new(nextState.Cur, nextState.Set.Next);
     UpdateNext();
     return true;
   }
@@ -351,277 +368,10 @@ public class ExecPathOpAxisPrecedingSibling(ExecPathOp Parent) : ExecPathOpAxis(
 {
   protected override void InitCtx(ref AxisState state) => NextCtx(ref state);
   protected override void NextCtx(ref AxisState state) =>
-    state.Cur.PreviousSibling(out state.Cur);
+    state.Valid = state.Cur.PreviousSibling(out state.Cur);
 }
 public class ExecPathOpAxisSelf(ExecPathOp Parent) : ExecPathOpAxis(Parent, AxisType.Self)
 {
   protected override void InitCtx(ref AxisState state) => state.Valid = true;
   protected override void NextCtx(ref AxisState state) => state.Valid = false;
-}
-
-public ref partial struct Exec
-{
-  private bool AxisInit(AxisType axis, ref XPNavigator nav, out PathState state) => axis switch
-  {
-    AxisType.Ancestor => AxisAncestor.Init(ref nav, out state),
-    AxisType.AncestorOrSelf => AxisAncestorOrSelf.Init(ref nav, out state),
-    AxisType.Attribute => AxisAttribute.Init(ref nav, out state),
-    AxisType.Child => AxisChild.Init(ref nav, out state),
-    AxisType.Descendant => AxisDescendant.Init(ref nav, out state),
-    AxisType.DescendantOrSelf => AxisDescendantOrSelf.Init(ref nav, out state),
-    AxisType.Following => AxisFollowing.Init(ref nav, out state),
-    AxisType.FollowingSibling => AxisFollowingSibling.Init(ref nav, out state),
-    AxisType.Namespace => AxisNamespace.Init(ref nav, out state),
-    AxisType.Parent => AxisParent.Init(ref nav, out state),
-    AxisType.Preceding => AxisPreceding.Init(ref nav, out state),
-    AxisType.PrecedingSibling => AxisPrecedingSibling.Init(ref nav, out state),
-    AxisType.Self => AxisSelf.Init(ref nav, out state),
-    _ => throw new InvalidOperationException($"{axis}"),
-  };
-
-  private bool AxisNext(AxisType axis, ref XPNavigator nav, ref PathState state) => axis switch
-  {
-    AxisType.Ancestor => AxisAncestor.Next(ref nav, ref state),
-    AxisType.AncestorOrSelf => AxisAncestorOrSelf.Next(ref nav, ref state),
-    AxisType.Attribute => AxisAttribute.Next(ref nav, ref state),
-    AxisType.Child => AxisChild.Next(ref nav, ref state),
-    AxisType.Descendant => AxisDescendant.Next(ref nav, ref state),
-    AxisType.DescendantOrSelf => AxisDescendantOrSelf.Next(ref nav, ref state),
-    AxisType.Following => AxisFollowing.Next(ref nav, ref state),
-    AxisType.FollowingSibling => AxisFollowingSibling.Next(ref nav, ref state),
-    AxisType.Namespace => AxisNamespace.Next(ref nav, ref state),
-    AxisType.Parent => AxisParent.Next(ref nav, ref state),
-    AxisType.Preceding => AxisPreceding.Next(ref nav, ref state),
-    AxisType.PrecedingSibling => AxisPrecedingSibling.Next(ref nav, ref state),
-    AxisType.Self => AxisSelf.Next(ref nav, ref state),
-    _ => throw new InvalidOperationException($"{axis}"),
-  };
-
-  private interface IAxis
-  {
-    public abstract static bool Init(ref XPNavigator nav, out PathState state);
-    public abstract static bool Next(ref XPNavigator nav, ref PathState state);
-  }
-
-  private class AxisAncestor : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = default;
-      return Next(ref nav, ref state);
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state) =>
-      nav.Parent(out var parent) && (nav = parent).Node.Valid;
-  }
-  private class AxisAncestorOrSelf : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = default;
-      return true;
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state) =>
-      AxisAncestor.Next(ref nav, ref state);
-  }
-  private class AxisAttribute : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = default;
-      return nav.FirstAttribute(out var attr) && (nav = attr).Node.Valid;
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state) =>
-      nav.NextAttribute(out var attr) && (nav = attr).Node.Valid;
-  }
-  private class AxisChild : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = default;
-      return nav.FirstChild(out var child) && (nav = child).Node.Valid;
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state) =>
-      nav.NextSibling(out var next) && (nav = next).Node.Valid;
-  }
-  private class AxisDescendant : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = new() { Base = nav };
-      return Next(ref nav, ref state);
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state)
-    {
-      if (nav.FirstChild(out var next))
-        return (nav = next).Node.Valid;
-      while (!nav.SameAs(state.Base))
-      {
-        if (nav.NextSibling(out next))
-          return (nav = next).Node.Valid;
-        if (!nav.Parent(out next))
-          throw new InvalidOperationException();
-        nav = next;
-      }
-      return false;
-    }
-  }
-  private class AxisDescendantOrSelf : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = new() { Base = nav };
-      return true;
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state) =>
-      AxisDescendant.Next(ref nav, ref state);
-  }
-  private class AxisFollowing : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      if (nav.IsAttribute() || nav.IsNs())
-      {
-        if (!nav.Parent(out var next))
-          throw new InvalidOperationException();
-        nav = next;
-      }
-      state = default;
-      while (true)
-      {
-        if (nav.NextSibling(out var next))
-          return (nav = next).Node.Valid;
-        if (!nav.Parent(out next))
-          return false;
-        nav = next;
-      }
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state)
-    {
-      if (nav.FirstChild(out var next))
-        return (nav = next).Node.Valid;
-      while (true)
-      {
-        if (nav.NextSibling(out next))
-          return (nav = next).Node.Valid;
-        if (!nav.Parent(out next))
-          return false;
-        nav = next;
-      }
-    }
-  }
-  private class AxisFollowingSibling : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = default;
-      return Next(ref nav, ref state);
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state) =>
-      nav.NextSibling(out var next) && (nav = next).Node.Valid;
-  }
-  private class AxisNamespace : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = default;
-      return nav.FirstNamespace(out var next) && (nav = next).Node.Valid;
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state) =>
-      nav.NextNamespace(out var next) && (nav = next).Node.Valid;
-  }
-  private class AxisParent : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = default;
-      return nav.Parent(out var next) && (nav = next).Node.Valid;
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state) => false;
-  }
-  private class AxisPreceding : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = new() { Base = nav, Depth = 0, PState = AxPreState.PrevSib };
-      return Next(ref nav, ref state);
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state)
-    {
-      while (true)
-      {
-        switch (state.PState)
-        {
-          case AxPreState.PrevSib:
-            {
-              if (nav.PreviousSibling(out var next))
-              {
-                // if we have a previous sibling, move to it and try its children first
-                nav = next;
-                state.PState = AxPreState.LastChild;
-                continue;
-              }
-              // otherwise go to parent and try again
-              state.PState = AxPreState.Parent;
-              continue;
-            }
-          case AxPreState.LastChild:
-            {
-              if (nav.LastChild(out var next))
-              {
-                // if we have a child, move to last and try its children
-                nav = next;
-                state.Depth++;
-                continue;
-              }
-              // otherwise return this node, and move to previous sibling next
-              state.PState = AxPreState.PrevSib;
-              return true;
-            }
-          case AxPreState.Parent:
-            {
-              // if we are at the root, we are done
-              if (!nav.Parent(out var next))
-                return false;
-              // otherwise its prev sibling will be next after possibly returning this
-              nav = next;
-              state.PState = AxPreState.PrevSib;
-              if (state.Depth == 0)
-              {
-                // if we are moving further upwards, move the base up
-                if (!state.Base.Parent(out next))
-                  throw new InvalidOperationException();
-                state.Base = next;
-                // if base matches, we are at an ancestor, so don't return it
-                if (nav.SameAs(state.Base))
-                  continue;
-              }
-              else
-                state.Depth--;
-              return true;
-            }
-          default:
-            throw new InvalidOperationException($"{state.PState}");
-        }
-      }
-    }
-  }
-  private class AxisPrecedingSibling : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = default;
-      return Next(ref nav, ref state);
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state) =>
-      nav.PreviousSibling(out var next) && (nav = next).Node.Valid;
-  }
-  private class AxisSelf : IAxis
-  {
-    public static bool Init(ref XPNavigator nav, out PathState state)
-    {
-      state = default;
-      return true;
-    }
-    public static bool Next(ref XPNavigator nav, ref PathState state) => false;
-  }
 }

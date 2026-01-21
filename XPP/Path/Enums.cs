@@ -87,47 +87,6 @@ public enum AstType
   Negate, // Tok:OpSub 0:Expr
 }
 
-public enum PathOpType
-{
-  Context, // start from context
-  Root, // start from root
-  Union, // start from union of [Paths]
-  Expr, // start from expression output
-  // VarRef, // start from variable
-  Axis, // walk axis from Parent
-  NodeType, // filter nodes from Parent by NodeType
-  NameTest, // filter nodes from Parent by [ns]:[name] (0:0 is *, 0:>0 is name, >0:>0 is ns:name, >0:0 is ns:*)
-  Filter, // filter nodes from Parent by SubExpr
-}
-
-public enum PathOpMode
-{
-  // FullNorm, // get full results, then sort and dedupe
-  Linear, // copy matching into next buffer
-  InsertExpand, // shift source elements forward in list after each expansion to maintain order
-}
-
-public enum ValOpType
-{
-  // Leaf val ops
-  Number,
-  String,
-  Variable,
-  Path, // get node-set from Path
-
-  // Unary ops
-  Negate,
-
-  // Binary ops
-  And, Or, // Boolean
-  Eq, Neq, Lt, Lte, Gt, Gte, // Compare
-  Add, Sub, Mult, Mod, Div, // Math
-
-  // N-ary ops
-  Func, // library function call
-  UserFunc, // custom function call
-}
-
 public enum AxisType
 {
   Invalid,
@@ -266,27 +225,6 @@ public partial class XPath
 
 public static partial class Extensions
 {
-  extension(TokenType type)
-  {
-    public ValOpType AsValOp => type switch
-    {
-      TokenType.OpAnd => ValOpType.And,
-      TokenType.OpOr => ValOpType.Or,
-      TokenType.OpMod => ValOpType.Mod,
-      TokenType.OpDiv => ValOpType.Div,
-      TokenType.OpMult => ValOpType.Mult,
-      TokenType.OpAdd => ValOpType.Add,
-      TokenType.OpSub => ValOpType.Sub,
-      TokenType.OpEq => ValOpType.Eq,
-      TokenType.OpNeq => ValOpType.Neq,
-      TokenType.OpLt => ValOpType.Lt,
-      TokenType.OpLte => ValOpType.Lte,
-      TokenType.OpGt => ValOpType.Gt,
-      TokenType.OpGte => ValOpType.Gte,
-      _ => throw new InvalidOperationException($"{type}"),
-    };
-  }
-
   extension(AxisType axis)
   {
     public bool IsForward => axis switch
@@ -351,12 +289,6 @@ public static partial class Extensions
       AxisType.Namespace => XPType.Namespace,
       _ => XPType.Element,
     };
-  }
-
-  extension(PathOpType type)
-  {
-    public bool IsRoot => type is
-      PathOpType.Context or PathOpType.Root or PathOpType.Union or PathOpType.Expr;
   }
 
   extension(LibraryFunc func)

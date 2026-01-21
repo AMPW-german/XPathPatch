@@ -1,145 +1,84 @@
 
 using System;
-using System.Globalization;
+using System.Collections.Generic;
 using XPP.Doc;
-using XPP.Utils;
 
 namespace XPP.Path;
 
-public struct ExecValue2(XPValueType type)
-{
-  public XPValueType Type = type;
-  public bool Bool;
-  public double Number;
-  public string String;
-  public ExecPathOp NodeSet;
-
-  public ExecValue2(bool val) : this(XPValueType.Bool) => Bool = val;
-  public ExecValue2(double val) : this(XPValueType.Number) => Number = val;
-  public ExecValue2(string val) : this(XPValueType.String) => String = val;
-  public ExecValue2(ReadOnlySpan<char> val) : this(XPValueType.String) => String = new(val);
-  public ExecValue2(ExecPathOp val) : this(XPValueType.NodeSet) => NodeSet = val;
-
-  public bool BoolValue => throw new NotImplementedException();
-}
-
 public abstract class ExecExprOp()
 {
-  public abstract ExecValue2 Value(ExecPathCtx context);
+  public abstract ExecResult Value(ExecPathCtx context);
+
+  public ExecResult Evaluate(XPNodeRef node) => Value(new(node.Nav, ExecCtxSet.One));
 }
 
 public class ExecExprOpPath(ExecPathOp Path) : ExecExprOp()
 {
   public readonly ExecPathOp Path = Path;
 
-  public override ExecValue2 Value(ExecPathCtx context)
+  public override ExecResult Value(ExecPathCtx context)
   {
     Path.Init(context.Nav);
     return new(Path);
   }
 }
 
-public class ExecExprOpTempCount(ExecExprOp Arg) : ExecExprOp()
+public class ExecExprOpConstant(ExecResult Val) : ExecExprOp()
 {
-  public readonly ExecExprOp Arg = Arg;
+  public readonly ExecResult Val = Val;
+  public override ExecResult Value(ExecPathCtx context) => Val;
+}
 
-  public override ExecValue2 Value(ExecPathCtx context)
+public class ExecExprOpNegate(ExecExprOp Base) : ExecExprOp()
+{
+  public readonly ExecExprOp Base = Base;
+
+  public override ExecResult Value(ExecPathCtx context) =>
+    new(-Base.Value(context).NumberValue);
+}
+
+public class ExecExprOpLogic(ExecExprOp Left, ExecExprOp Right, TokenType Op)
+  : ExecExprOp()
+{
+  public readonly ExecExprOp Left = Left;
+  public readonly ExecExprOp Right = Right;
+  public readonly TokenType Op = Op;
+
+  public override ExecResult Value(ExecPathCtx context)
   {
-    var val = Arg.Value(context);
-    if (val.Type != XPValueType.NodeSet)
-      throw new InvalidOperationException($"Arg must be NodeSet, not {val.Type}");
-    var count = 0;
-    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-    var nextPrint = 1000;
-    foreach (var node in val.NodeSet)
+    var lval = Left.Value(context).BoolValue;
+    var rval = Right.Value(context).BoolValue;
+
+    return new(Op switch
     {
-      count++;
-      if ((count & 0xFFFF) == 0 && stopwatch.Elapsed.TotalMilliseconds > nextPrint)
-      {
-        Console.WriteLine(count);
-        nextPrint += 1000;
-      }
-    }
-    return new(count);
+      TokenType.OpAnd => lval && rval,
+      TokenType.OpOr => lval || rval,
+      _ => throw new InvalidOperationException($"{Op}"),
+    });
   }
 }
 
-public ref partial struct Exec
+public class ExecExprOpCompare(ExecExprOp Left, ExecExprOp Right, TokenType Op)
+  : ExecExprOp()
 {
-  private struct Value(XPValueType type)
+  public readonly ExecExprOp Left = Left;
+  public readonly ExecExprOp Right = Right;
+  public readonly TokenType Op = Op;
+
+  public override ExecResult Value(ExecPathCtx context)
   {
-    public XPValueType Type = type;
-    public bool Bool;
-    public double Number;
-    public string String;
-    public int NodeSet;
-
-    public Value(bool val) : this(XPValueType.Bool) => Bool = val;
-    public Value(double val) : this(XPValueType.Number) => Number = val;
-    public Value(string val) : this(XPValueType.String) => String = val;
-    public Value(ReadOnlySpan<char> val) : this(XPValueType.String) => String = new(val);
-
-    public static Value MakeNodeSet(int index) =>
-      new(XPValueType.NodeSet) { NodeSet = index };
-  }
-
-  private Value GetValue(int idx, PathContext ctx)
-  {
-    ref readonly var op = ref path.Vals[idx];
-    switch (op.Type)
-    {
-      case ValOpType.Number: return new(op.Number);
-      case ValOpType.String: return new(op.String);
-      case ValOpType.Variable:
-        throw new NotImplementedException();
-      case ValOpType.Path:
-        ExecPath(op.Left, ctx.Nav);
-        return Value.MakeNodeSet(op.Left);
-      case ValOpType.Negate:
-        return new(-NumberValue(GetValue(op.Left, ctx)));
-      case ValOpType.And or ValOpType.Or: return BoolOp(idx, ctx);
-      case ValOpType.Eq or ValOpType.Neq or ValOpType.Lt or ValOpType.Lte or ValOpType.Gt or ValOpType.Gte:
-        return CompareOp(idx, ctx);
-      case ValOpType.Add or ValOpType.Sub or ValOpType.Mult or ValOpType.Mod or ValOpType.Div:
-        return MathOp(idx, ctx);
-      case ValOpType.Func:
-        return FuncValue(idx, ctx);
-      case ValOpType.UserFunc:
-        throw new NotImplementedException();
-      default:
-        throw new InvalidOperationException($"{op.Type}");
-    }
-  }
-
-  private Value BoolOp(int idx, PathContext ctx)
-  {
-    ref readonly var op = ref path.Vals[idx];
-    var left = BoolValue(GetValue(op.Left, ctx));
-    return new(op.Type switch
-    {
-      ValOpType.And when !left => false,
-      ValOpType.Or when left => true,
-      ValOpType.And or ValOpType.Or => BoolValue(GetValue(op.Right, ctx)),
-      _ => throw new InvalidOperationException($"{op.Type}"),
-    });
-  }
-
-  private Value CompareOp(int idx, PathContext ctx)
-  {
-    ref readonly var op = ref path.Vals[idx];
-    var left = GetValue(op.Left, ctx);
-    var right = GetValue(op.Right, ctx);
+    var left = Left.Value(context);
+    var right = Right.Value(context);
 
     bool res;
-
     if (left.Type is XPValueType.NodeSet && right.Type is XPValueType.NodeSet)
     {
       var (lidx, ridx) = (left.NodeSet, right.NodeSet);
-      if (op.Type is ValOpType.Eq or ValOpType.Neq)
-        res = NodeSetsEqual(lidx, ridx, op.Type is ValOpType.Eq);
+      if (Op is TokenType.OpEq or TokenType.OpNeq)
+        res = NodeSetsEqual(lidx, ridx, Op is TokenType.OpEq);
       else
       {
-        var (minCmp, maxCmp) = ValOpCompareRange(op.Type);
+        var (minCmp, maxCmp) = ValOpCompareRange(Op);
         res = NodeSetsCompare(lidx, ridx, minCmp, maxCmp);
       }
     }
@@ -147,29 +86,23 @@ public ref partial struct Exec
     {
       var swap = right.Type is XPValueType.NodeSet;
       if (swap)
-      {
-        var temp = left;
-        left = right;
-        right = temp;
-      }
+        (right, left) = (left, right);
 
-      if (op.Type is ValOpType.Eq or ValOpType.Neq)
-        res = NodeSetValEqual(left.NodeSet, right, op.Type is ValOpType.Eq);
+      if (Op is TokenType.OpEq or TokenType.OpNeq)
+        res = NodeSetValEqual(left.NodeSet, right, Op is TokenType.OpEq);
       else
       {
-        var (minCmp, maxCmp) = ValOpCompareRange(op.Type);
+        var (minCmp, maxCmp) = ValOpCompareRange(Op);
         if (swap)
           (minCmp, maxCmp) = (-maxCmp, -minCmp);
         res = NodeSetValCompare(left.NodeSet, right, minCmp, maxCmp);
       }
     }
-    else if (op.Type is ValOpType.Eq or ValOpType.Neq)
-    {
-      res = ValsEqual(left, right) == op.Type is ValOpType.Eq;
-    }
+    else if (Op is TokenType.OpEq or TokenType.OpNeq)
+      res = ValsEqual(left, right) == Op is TokenType.OpEq;
     else
     {
-      var (minCmp, maxCmp) = ValOpCompareRange(op.Type);
+      var (minCmp, maxCmp) = ValOpCompareRange(Op);
       var cmp = ValsCompare(left, right);
       res = cmp >= minCmp && cmp <= maxCmp;
     }
@@ -177,88 +110,115 @@ public ref partial struct Exec
     return new(res);
   }
 
-  private static (int, int) ValOpCompareRange(ValOpType type) => type switch
+  private static (int, int) ValOpCompareRange(TokenType type) => type switch
   {
-    ValOpType.Lt => (-1, -1),
-    ValOpType.Lte => (-1, 0),
-    ValOpType.Gt => (1, 1),
-    ValOpType.Gte => (0, 1),
+    TokenType.OpLt => (-1, -1),
+    TokenType.OpLte => (-1, 0),
+    TokenType.OpGt => (1, 1),
+    TokenType.OpGte => (0, 1),
     _ => throw new InvalidOperationException($"{type}"),
   };
 
-  private bool NodeSetsEqual(int lidx, int ridx, bool expected)
+  private List<string> lstrings;
+  private List<string> rstrings;
+  private bool NodeSetsEqual(ExecPathOp left, ExecPathOp right, bool expected)
   {
-    var lstart = stringBuf.Length;
-    foreach (var node in PathResult(lidx))
-      stringBuf.Add(new(NodeStringValue(node.Nav)));
-    var rstart = stringBuf.Length;
-    foreach (var node in PathResult(ridx))
-      stringBuf.Add(new(NodeStringValue(node.Nav)));
-    var end = stringBuf.Length;
+    lstrings ??= [];
+    lstrings.Clear();
+    foreach (var node in left)
+      lstrings.Add(ExecValue.NodeStringValue(node));
 
-    var lstrs = stringBuf[lstart..rstart];
-    var rstrs = stringBuf[rstart..end];
+    if (lstrings.Count == 0)
+      return false;
 
-    stringBuf.Length = lstart;
+    rstrings ??= [];
+    rstrings.Clear();
+    foreach (var node in right)
+      rstrings.Add(ExecValue.NodeStringValue(node));
 
-    lstrs.Sort();
-    rstrs.Sort();
-
-    lidx = ridx = 0;
-    while (lidx < lstrs.Length && ridx < rstrs.Length)
+    if (rstrings.Count == 0)
     {
-      var cmp = lstrs[lidx].CompareTo(rstrs[ridx]);
+      lstrings.Clear();
+      return false;
+    }
+
+    lstrings.Sort();
+    rstrings.Sort();
+
+    if (!expected)
+    {
+      var (lfirst, llast) = (lstrings[0], lstrings[^1]);
+      var (rfirst, rlast) = (rstrings[0], rstrings[^1]);
+      lstrings.Clear();
+      rstrings.Clear();
+      return lfirst != rfirst || lfirst != llast || rfirst != rlast;
+    }
+
+    var lidx = 0;
+    var ridx = 0;
+    var res = false;
+    while (lidx < lstrings.Count && ridx < rstrings.Count)
+    {
+      var cmp = lstrings[lidx].CompareTo(rstrings[ridx]);
       if (cmp < 0)
         lidx++;
       else if (cmp > 0)
         ridx++;
       else
-        return true;
+      {
+        res = true;
+        break;
+      }
     }
-    return false;
+    lstrings.Clear();
+    rstrings.Clear();
+    return res;
   }
 
-  private bool NodeSetsCompare(int lidx, int ridx, int minCmp, int maxCmp)
+  private static bool NodeSetsCompare(ExecPathOp left, ExecPathOp right, int minCmp, int maxCmp)
   {
     var less = minCmp < 0;
-
-    var lnodes = PathResult(lidx);
-    var rnodes = PathResult(lidx);
-
-    if (lnodes.Length == 0 || rnodes.Length == 0)
+    var lbound = 0.0;
+    var hasL = false;
+    foreach (var node in left)
+    {
+      var val = ExecValue.NodeNumberValue(node);
+      if (hasL)
+        lbound = less ? Math.Min(lbound, val) : Math.Max(lbound, val);
+      else
+      {
+        hasL = true;
+        lbound = val;
+      }
+    }
+    if (!hasL)
       return false;
 
-    var lbound = NodeNumberValue(lnodes[0].Nav);
-    foreach (var node in lnodes[1..])
+    foreach (var node in right)
     {
-      var val = NodeNumberValue(node.Nav);
-      lbound = less ? Math.Min(lbound, val) : Math.Max(lbound, val);
-    }
-    foreach (var node in rnodes)
-    {
-      var cmp = lbound.CompareTo(NodeNumberValue(node.Nav));
+      var cmp = lbound.CompareTo(ExecValue.NodeNumberValue(node));
       if (cmp >= minCmp && cmp <= maxCmp)
         return true;
     }
     return false;
   }
 
-  private bool NodeSetValEqual(int nodes, Value val, bool expected)
+  private static bool NodeSetValEqual(ExecPathOp nodes, ExecResult val, bool expected)
   {
-    foreach (var node in PathResult(nodes))
+    foreach (var node in nodes)
     {
-      if (ValsEqual(new(NodeStringValue(node.Nav)), val) == expected)
+      if (ValsEqual(new(ExecValue.NodeStringValue(node)), val) == expected)
         return true;
     }
     return false;
   }
 
-  private bool NodeSetValCompare(int nodes, Value val, int minCmp, int maxCmp)
+  private static bool NodeSetValCompare(ExecPathOp nodes, ExecResult val, int minCmp, int maxCmp)
   {
-    var right = NumberValue(val);
-    foreach (var node in PathResult(nodes))
+    var right = val.NumberValue;
+    foreach (var node in nodes)
     {
-      var left = NodeNumberValue(node.Nav);
+      var left = ExecValue.NodeNumberValue(node);
       var cmp = left.CompareTo(right);
       if (cmp >= minCmp && cmp <= maxCmp)
         return true;
@@ -266,98 +226,62 @@ public ref partial struct Exec
     return false;
   }
 
-  private bool ValsEqual(Value left, Value right)
+  private static bool ValsEqual(ExecResult left, ExecResult right)
   {
     if (left.Type is XPValueType.Bool || right.Type is XPValueType.Bool)
-      return BoolValue(left) == BoolValue(right);
+      return left.BoolValue == right.BoolValue;
     else if (left.Type is XPValueType.Number || right.Type is XPValueType.Number)
-      return NumberValue(left) == NumberValue(right);
+      return left.NumberValue == right.NumberValue;
     else if (left.Type is XPValueType.String && right.Type is XPValueType.String)
       return left.String == right.String;
     else
       throw new InvalidOperationException($"{left.Type} {right.Type}");
   }
 
-  private int ValsCompare(Value left, Value right) =>
-    NumberValue(left).CompareTo(NumberValue(right));
+  private static int ValsCompare(ExecResult left, ExecResult right) =>
+    left.NumberValue.CompareTo(right.NumberValue);
+}
 
-  private Value MathOp(int idx, PathContext ctx)
+public class ExecExprOpMath(ExecExprOp Left, ExecExprOp Right, TokenType Op)
+  : ExecExprOp()
+{
+  public readonly ExecExprOp Left = Left;
+  public readonly ExecExprOp Right = Right;
+  public readonly TokenType Op = Op;
+
+  public override ExecResult Value(ExecPathCtx context)
   {
-    ref readonly var op = ref path.Vals[idx];
-    var left = NumberValue(GetValue(op.Left, ctx));
-    var right = NumberValue(GetValue(op.Right, ctx));
-    return new(op.Type switch
+    var lval = Left.Value(context).NumberValue;
+    var rval = Right.Value(context).NumberValue;
+    return new(Op switch
     {
-      ValOpType.Add => left + right,
-      ValOpType.Sub => left - right,
-      ValOpType.Mult => left * right,
-      ValOpType.Mod => left % right,
-      ValOpType.Div => left / right,
-      _ => throw new InvalidOperationException($"{op.Type}"),
+      TokenType.OpAdd => lval + rval,
+      TokenType.OpSub => lval - rval,
+      TokenType.OpMult => lval * rval,
+      TokenType.OpDiv => lval / rval,
+      TokenType.OpMod => lval % rval,
+      _ => throw new InvalidOperationException($"{Op}"),
     });
   }
+}
 
-  private bool BoolValue(Value val) => val.Type switch
+public class ExecExprOpVariable(string Name) : ExecExprOp()
+{
+  public readonly string Name = Name;
+
+  public override ExecResult Value(ExecPathCtx context)
   {
-    XPValueType.Bool => val.Bool,
-    XPValueType.Number => val.Number != 0 && !double.IsNaN(val.Number),
-    XPValueType.String => val.String.Length > 0,
-    XPValueType.NodeSet => PathResult(val.NodeSet).Length > 0,
-    _ => throw new InvalidOperationException($"{val.Type}"),
-  };
-
-  private double NumberValue(Value val) => val.Type switch
-  {
-    XPValueType.Bool => val.Bool ? 1 : 0,
-    XPValueType.Number => val.Number,
-    XPValueType.String => StringNumberValue(val.String),
-    XPValueType.NodeSet => NodeSetNumberValue(val.NodeSet),
-    _ => throw new InvalidOperationException($"{val.Type}"),
-  };
-
-  private double NodeSetNumberValue(int nodeSet) =>
-    StringNumberValue(NodeSetStringValue(nodeSet));
-
-  private double NodeNumberValue(XPNavigator nav) =>
-    StringNumberValue(NodeStringValue(nav));
-
-  private double StringNumberValue(ReadOnlySpan<char> val) =>
-    double.TryParse(
-      val,
-      NumberStyles.Integer | NumberStyles.AllowDecimalPoint,
-      null,
-      out double parsed
-    ) ? parsed : double.NaN;
-
-  private string StringValue(Value val) => val.Type switch
-  {
-    XPValueType.Bool => val.Bool ? TRUE : FALSE,
-    XPValueType.Number => NumberStringValue(val.Number),
-    XPValueType.String => val.String,
-    XPValueType.NodeSet => new(NodeSetStringValue(val.NodeSet)),
-    _ => throw new InvalidOperationException($"{val.Type}"),
-  };
-
-  public static string BoolStringValue(bool val) => val ? TRUE : FALSE;
-  public static string NumberStringValue(double num)
-  {
-    if (double.IsNaN(num))
-      return NAN;
-    if (num == 0 || num == -0)
-      return ZERO;
-    if (double.IsPositiveInfinity(num))
-      return PINF;
-    if (double.IsNegativeInfinity(num))
-      return NINF;
-
-    return $"{num:f}";
+    throw new NotImplementedException();
   }
+}
 
-  private ReadOnlySpan<char> NodeSetStringValue(int idx) =>
-    PathResult(idx) is PooledAppendList<PathContext> { Length: > 0 } nodes
-      ? NodeStringValue(nodes[0].Nav)
-      : [];
+public class ExecExprOpUserFunc(string Name, ExecExprOp[] Args) : ExecExprOp()
+{
+  public readonly string Name = Name;
+  public readonly ExecExprOp[] Args = Args;
 
-  private ReadOnlySpan<char> NodeStringValue(XPNavigator nav) =>
-    dataBuf[..nav.StringValue(dataBuf)];
+  public override ExecResult Value(ExecPathCtx context)
+  {
+    throw new NotImplementedException();
+  }
 }

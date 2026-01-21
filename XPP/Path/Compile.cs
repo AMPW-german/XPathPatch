@@ -2,610 +2,302 @@
 using System;
 using System.Collections.Generic;
 using XPP.Doc;
-using XPP.Utils;
 
 namespace XPP.Path;
 
-public struct PathOp(PathOpType type)
+public static class Compiler
 {
-  public PathOpType Type = type;
-  public PathOpMode Mode;
-  // Mode Flags
-  public bool Forward;
-  public bool Dedupe;
-  public bool Reverse;
-  // Metadata
-  public int RootNum;
-  public int Length;
+  public static ExecExprOp Compile(string source) => CompileExpr(Parser.Parse(source));
 
-  // Union
-  public int UnionL;
-  public int UnionR;
-
-  // Axis
-  public AxisType Axis;
-
-  // NodeType
-  public NodeType NodeType;
-
-  // NameTest
-  public string Ns;
-  public string Name;
-  public XPType PType;
-
-  // Filter/Expr
-  public int Expr;
-}
-
-public struct ValOp(ValOpType type)
-{
-  public ValOpType Type = type;
-
-  public int Left = -1;
-  public int Right = -1;
-
-  // Number
-  public double Number;
-  // String, Variable, UserFunc
-  public string String;
-
-  // Func
-  public LibraryFunc Func;
-  // Func and UserFunc
-  public Range Args;
-}
-
-public ref struct Compiler
-{
-  public static void Compile(
-    AstNode astRoot, out ReadOnlySpan<PathOp> paths, out ReadOnlySpan<ValOp> vals)
+  private static ExecExprOp CompileExpr(AstNode astNode)
   {
-    var compiler = new Compiler(astRoot);
-    compiler.Compile();
-
-    paths = compiler.paths.Span;
-    vals = compiler.vals.Span;
-  }
-
-  // compile state of an AST node
-  private class State()
-  {
-    public int PathStart = -1;
-    public int PathIdx = -1;
-    public int ValIdx = -1;
-  }
-
-  private class QueueEntry(AstNode Node, bool Path)
-  {
-    public AstNode Node = Node;
-    public bool Path = Path;
-  }
-
-  private class CompileBuf<O, T>() : ThreadBuf<O, T>(XPath.MAX_LENGTH) where O : CompileBuf<O, T>, new();
-  private class PathBuf : CompileBuf<PathBuf, PathOp>;
-  private class ValBuf : CompileBuf<ValBuf, ValOp>;
-
-  private readonly AstNode astRoot;
-
-  // result output bufs
-  private SpanBuf<PathOp> paths;
-  private SpanBuf<ValOp> vals;
-
-  // compile states by node
-  private readonly Dictionary<AstNode, State> states = [];
-
-  private readonly List<QueueEntry> queue = [];
-
-  private Compiler(AstNode astRoot)
-  {
-    this.astRoot = astRoot;
-
-    paths = PathBuf.Buf;
-    vals = ValBuf.Buf;
-  }
-
-  private State StateOf(AstNode node)
-  {
-    if (!states.TryGetValue(node, out var state))
-      states[node] = state = new();
-    return state;
-  }
-
-  private void Compile()
-  {
-    QueueExpr(astRoot);
-    DrainQueue();
-
-    var rootNum = -1;
-    for (var i = 0; i < paths.Length; i++)
+    switch (astNode.Type)
     {
-      if (paths[i].Type.IsRoot)
-        rootNum++;
-      paths[i].RootNum = rootNum;
+      case AstType.Root or AstType.Sep or AstType.Axis or AstType.NodeTest or
+          AstType.ProcType or AstType.PathFilter or AstType.ExprFilter or AstType.Union:
+        return new ExecExprOpPath(CompilePath(astNode));
+      case AstType.Value:
+        return astNode.Token.Type switch
+        {
+          TokenType.VarRef => new ExecExprOpVariable(astNode.Token.String[1..]),
+          TokenType.String => new ExecExprOpConstant(new(astNode.Token.String[1..^1])),
+          TokenType.Number => new ExecExprOpConstant(
+            new(double.Parse(astNode.Token.String))),
+          _ => throw new InvalidOperationException($"{astNode.Token.Type}"),
+        };
+      case AstType.FuncCall:
+        var args = new List<ExecExprOp>();
+        BuildArgList(args, astNode.Child0);
+        var func = XPath.ParseLibraryFunc(astNode.Token.String);
+        if (func == LibraryFunc.Invalid)
+          return new ExecExprOpUserFunc(astNode.Token.String, [.. args]);
+        return new ExecExprOpFunc(func, [.. args]);
+      case AstType.BoolOp:
+        return new ExecExprOpLogic(
+          CompileExpr(astNode.Child0), CompileExpr(astNode.Child1), astNode.Token.Type);
+      case AstType.CompareOp:
+        return new ExecExprOpCompare(
+          CompileExpr(astNode.Child0), CompileExpr(astNode.Child1), astNode.Token.Type);
+      case AstType.MathOp:
+        return new ExecExprOpMath(
+          CompileExpr(astNode.Child0), CompileExpr(astNode.Child1), astNode.Token.Type);
+      case AstType.Negate:
+        return new ExecExprOpNegate(CompileExpr(astNode.Child0));
+      case AstType.ArgList:
+      default:
+        throw new InvalidOperationException($"{astNode.Type}");
     }
   }
 
-  private void DrainQueue()
+  private static void BuildArgList(List<ExecExprOp> args, AstNode astNode)
   {
-    while (queue.Count > 0)
+    if (astNode is null)
+      return;
+    if (astNode.Type is AstType.ArgList)
     {
-      var entry = queue[^1];
-      queue.RemoveAt(queue.Count-1);
-      if (entry.Path)
-        CompilePath(entry.Node);
-      else
-        CompileExpr(entry.Node);
+      BuildArgList(args, astNode.Child0);
+      BuildArgList(args, astNode.Child1);
     }
-  }
-
-  private void CompileExpr(AstNode node)
-  {
-    var compile = new ExprCompilePass();
-    var backfill = new ExprBackfillPass();
-
-    WalkExpr(node, ref compile);
-    DrainQueue();
-    WalkExpr(node, ref backfill);
-  }
-
-  private void CompilePath(AstNode node)
-  {
-    var state = StateOf(node);
-    state.PathStart = paths.Length;
-
-    var compile = new PathCompilePass();
-    var backfill = new PathBackfillPass();
-
-    WalkPath(node, ref compile);
-    if (!paths[^1].Type.IsRoot)
-    {
-      compile.EnsureAxis(ref this);
-      AddPath(new(PathOpType.Context));
-    }
-    DrainQueue();
-    WalkPath(node, ref backfill);
-
-    // after we have everything filled in, walk from the end and set mode and flags
-    var index = state.PathStart;
-    var count = 1;
-    while (!paths[index + count - 1].Type.IsRoot) count++;
-
-    var lastDupe = false;
-    for (var i = index + count; --i >= index;)
-    {
-      ref var path = ref paths[i];
-      if (path.Type.IsRoot)
-      {
-        lastDupe = false;
-        path.Mode = PathOpMode.Linear;
-        path.Forward = true;
-        continue;
-      }
-      ref var nextPath = ref paths[i + 1];
-      if (path.Type is PathOpType.Axis)
-      {
-        if (lastDupe)
-          nextPath.Dedupe = true;
-        var axis = path.Axis;
-        path.Forward = axis.IsForward;
-        if (path.Forward != nextPath.Forward)
-          nextPath.Reverse = true;
-        path.Mode = axis.CanInterleave || lastDupe ? PathOpMode.InsertExpand : PathOpMode.Linear;
-        lastDupe = axis.CanDupe;
-      }
-      else
-      {
-        path.Mode = PathOpMode.Linear;
-        path.Forward = nextPath.Forward;
-      }
-      if (path.Type is PathOpType.NameTest)
-      {
-        ref var next = ref paths[i + 1];
-        if (next.Type != PathOpType.Axis)
-          throw new InvalidOperationException();
-        path.PType = next.Axis.PrincipalType;
-      }
-    }
-    if (lastDupe)
-      paths[index].Dedupe = true;
-    if (!paths[index].Forward)
-      paths[index].Reverse = true;
-
-    // finally reverse the order
-    paths[index..(index + count)].Reverse();
-    paths[index].Length = count;
-  }
-
-  private void QueuePath(AstNode node) => queue.Add(new(node, true));
-  private void QueueExpr(AstNode node) => queue.Add(new(node, false));
-
-  private int AddPath(PathOp op) => paths.Add(op);
-  private void AddExpr(ref State state, ValOp op)
-  {
-    if (state.ValIdx != -1)
-      vals[state.ValIdx] = op;
     else
-      state.ValIdx = vals.Add(op);
+      args.Add(CompileExpr(astNode));
   }
 
-  private int ReserveExpr(AstNode node)
+  private class PathNode(AstNode node, PathNode prev = null, ExecExprOp expr = null)
   {
-    var state = StateOf(node);
-    if (state.ValIdx != -1)
-      return state.ValIdx;
-    return state.ValIdx = vals.Add(default);
+    public AstType Type = node.Type;
+    public Token Token = node.Token;
+    public PathNode Prev = prev;
+    public ExecExprOp Expr = expr;
+    public ExecExprOp InExpr;
+    public ExecPathOp UnionL;
+    public ExecPathOp UnionR;
   }
 
-  private int ValOpIndex(AstNode node)
+  private static PathNode BuildPath(AstNode astNode, PathNode prev = null)
   {
-    var state = StateOf(node);
-    if (state.ValIdx == -1)
-      throw new InvalidOperationException($"{node.Type}");
-    return state.ValIdx;
-  }
-
-  private int PathStart(AstNode node)
-  {
-    var state = StateOf(node);
-    if (state.PathStart == -1)
-      throw new InvalidOperationException($"{node.Type}");
-    return state.PathStart;
-  }
-
-  // Initial expression pass. compile nodes and queue paths
-  private readonly struct ExprCompilePass : ICompilerPass
-  {
-    public void Visit(ref Compiler compiler, AstNode node, State state)
+    PathNode usedPrev = null;
+    PathNode res = null;
+    try
     {
-      switch (node.Type)
+      return res = astNode.Type switch
       {
-        case AstType.Root:
-        case AstType.Sep:
-        case AstType.Axis:
-        case AstType.NodeTest:
-        case AstType.ProcType:
-        case AstType.PathFilter:
-        case AstType.ExprFilter:
-        case AstType.Union:
-          compiler.ReserveExpr(node);
-          compiler.QueuePath(node);
-          break;
-        case AstType.Value:
-          compiler.AddExpr(ref state, node.Token.Type switch
-          {
-            TokenType.VarRef =>
-              new(ValOpType.Variable) { String = node.Token.String[1..] },
-            TokenType.String =>
-              new(ValOpType.String) { String = node.Token.String[1..^1] },
-            TokenType.Number =>
-              new(ValOpType.Number) { Number = double.Parse(node.Token.String) },
-            _ => throw new InvalidOperationException($"{node.Token.Type}"),
-          });
-          break;
-        case AstType.FuncCall:
-          var func = XPath.ParseLibraryFunc(node.Token.String);
-          // reserve spot for func op, then reserve args
-          compiler.ReserveExpr(node);
-          var (argStart, argCount) = ReserveArgs(ref compiler, node.Child0);
-          var (minArgs, maxArgs) = func.ArgCounts;
-          if (argCount < minArgs || argCount > maxArgs)
-            throw new InvalidOperationException(
-              $"invalid argcount for {node.Token.String}: {argCount} <> [{minArgs},{maxArgs}]");
-          var argRange = argStart..(argStart + argCount);
-          if (func != LibraryFunc.Invalid)
-            compiler.AddExpr(ref state,
-              new(ValOpType.Func) { Func = func, Args = argRange });
-          else
-            compiler.AddExpr(ref state, new(ValOpType.UserFunc)
-            {
-              String = new(node.Token.String),
-              Args = argRange,
-            });
-          break;
-        case AstType.ArgList: break;
-        case AstType.BoolOp:
-        case AstType.CompareOp:
-        case AstType.MathOp:
-          compiler.ReserveExpr(node);
-          compiler.ReserveExpr(node.Child0);
-          compiler.ReserveExpr(node.Child1);
-          compiler.AddExpr(ref state, new(node.Token.Type.AsValOp)
-          {
-            Left = compiler.ValOpIndex(node.Child0),
-            Right = compiler.ValOpIndex(node.Child1),
-          });
-          break;
-        case AstType.Negate:
-          compiler.ReserveExpr(node);
-          compiler.ReserveExpr(node.Child0);
-          compiler.AddExpr(ref state,
-            new(node.Token.Type.AsValOp) { Left = compiler.ValOpIndex(node.Child0) });
-          break;
-      }
+        AstType.Root => BuildPath(astNode.Child0, new(astNode)),
+        AstType.Sep => BuildPath(astNode.Child1,
+          new(astNode, BuildPath(astNode.Child0, usedPrev = prev))),
+        AstType.Axis => astNode.Token.Type switch
+        {
+          TokenType.AxisName => BuildPath(astNode.Child0, new(astNode, usedPrev = prev)),
+          TokenType.Attr => BuildPath(astNode.Child0, new(astNode, usedPrev = prev)),
+          TokenType.Self or TokenType.Parent => new(astNode, usedPrev = prev),
+          _ => throw new InvalidOperationException($"{astNode.Token.Type}"),
+        },
+        AstType.NodeTest or AstType.ProcType => new(astNode, usedPrev = prev),
+        AstType.PathFilter => new(astNode, BuildPath(astNode.Child0, usedPrev = prev),
+          CompileExpr(astNode.Child1)),
+        AstType.ExprFilter => new(astNode, expr: CompileExpr(astNode.Child1))
+        {
+          InExpr = CompileExpr(astNode.Child0),
+        },
+        AstType.Union => new(astNode)
+        {
+          UnionL = CompilePath(astNode.Child0),
+          UnionR = CompilePath(astNode.Child1)
+        },
+        AstType.BoolOp or AstType.CompareOp or AstType.MathOp
+        or AstType.Negate or AstType.FuncCall or AstType.Value
+        or AstType.ExprFilter => new(astNode) { InExpr = CompileExpr(astNode) },
+        _ => throw new InvalidOperationException($"{astNode.Type}"),
+      };
     }
-
-    private static (int first, int count) ReserveArgs(ref Compiler compiler, AstNode node)
+    finally
     {
-      if (node == null)
-        return (0, 0);
-      if (node.Type == AstType.ArgList)
-      {
-        var (first, cleft) = ReserveArgs(ref compiler, node.Child0);
-        var (_, cright) = ReserveArgs(ref compiler, node.Child1);
-        return (first, cleft + cright);
-      }
-      return (compiler.ReserveExpr(node), 1);
+      if (prev != null && usedPrev == null && res != null)
+        throw new InvalidOperationException($"unused prev node for {astNode.Type}");
     }
   }
 
-  // backfill path ops after paths are compiled
-  private readonly struct ExprBackfillPass : ICompilerPass
+  private class PathStep
   {
-    public void Visit(ref Compiler compiler, AstNode node, State state)
-    {
-      switch (node.Type)
-      {
-        case AstType.Root:
-        case AstType.Sep:
-        case AstType.Axis:
-        case AstType.NodeTest:
-        case AstType.ProcType:
-        case AstType.PathFilter:
-        case AstType.ExprFilter:
-        case AstType.Union:
-          compiler.AddExpr(ref state,
-            new(ValOpType.Path) { Left = compiler.PathStart(node) });
-          break;
-      }
-    }
+    public bool Root;
+    public PathNode Axis;
+    public PathNode NodeTest;
+    public List<PathNode> Filters;
   }
 
-  // assign all path nodes and queue child expressions and paths
-  private struct PathCompilePass() : ICompilerPass
+  private static (PathStep, PathNode) BuildStep(PathNode node)
   {
-    private bool hasAxis = false;
+    var step = new PathStep();
 
-    public void EnsureAxis(ref Compiler compiler)
+    if (node.Type is AstType.Root or AstType.Union || node.InExpr != null)
     {
-      if (hasAxis)
-        return;
-      compiler.AddPath(new(PathOpType.Axis) { Axis = AxisType.Child });
-      hasAxis = true;
+      step.Root = true;
+      step.Axis = node;
+      if (node.Type is AstType.ExprFilter)
+        step.Filters = [node];
+      return (step, null);
     }
 
-    public void Visit(ref Compiler compiler, AstNode node, State state)
+    if (node.Type is AstType.Sep)
     {
-      switch (node.Type)
-      {
-        case AstType.Root:
-          EnsureAxis(ref compiler);
-          if (node.Token.Type == TokenType.OpSepDesc)
-            compiler.AddPath(new(PathOpType.Axis) { Axis = AxisType.DescendantOrSelf });
-          compiler.AddPath(new(PathOpType.Root));
-          break;
-        case AstType.Sep:
-          EnsureAxis(ref compiler);
-          if (node.Token.Type == TokenType.OpSepDesc)
-            compiler.AddPath(new(PathOpType.Axis) { Axis = AxisType.DescendantOrSelf });
-          hasAxis = false;
-          break;
-        case AstType.Axis:
-          compiler.AddPath(new(PathOpType.Axis)
-          {
-            Axis = node.Token.Type switch
-            {
-              TokenType.AxisName => XPath.ParseAxisType(node.Token.String),
-              TokenType.Attr => AxisType.Attribute,
-              TokenType.Self => AxisType.Self,
-              TokenType.Parent => AxisType.Parent,
-              _ => throw new InvalidOperationException($"{node.Type} {node.Token.Type}"),
-            }
-          });
-          hasAxis = true;
-          break;
-        case AstType.NodeTest:
-          switch (node.Token.Type)
-          {
-            case TokenType.NtAny:
-              compiler.AddPath(new(PathOpType.NameTest)
-              {
-                Ns = "",
-                Name = "",
-              });
-              break;
-            case TokenType.NtAnyNs:
-              compiler.AddPath(new(PathOpType.NameTest)
-              {
-                Ns = TokNs(node.Token),
-                Name = "",
-              });
-              break;
-            case TokenType.NtName:
-              compiler.AddPath(new(PathOpType.NameTest)
-              {
-                Ns = TokNs(node.Token),
-                Name = TokName(node.Token),
-              });
-              break;
-            case TokenType.NodeType:
-              var ntype = XPath.ParseNodeType(node.Token.String);
-              if (ntype != NodeType.Node)
-                compiler.AddPath(new(PathOpType.NodeType) { NodeType = ntype });
-              break;
-            default:
-              throw new InvalidOperationException($"{node.Type} {node.Token.Type}");
-          }
-          hasAxis = false;
-          break;
-        case AstType.ProcType:
-          compiler.AddPath(
-            new(PathOpType.NameTest) { Name = new(node.Token.String) });
-          compiler.AddPath(
-            new(PathOpType.NodeType) { NodeType = NodeType.ProcessingInstruction });
-          hasAxis = false;
-          break;
-        case AstType.PathFilter:
-          // filter index will be backfilled
-          state.PathIdx = compiler.AddPath(new(PathOpType.Filter));
-          compiler.QueueExpr(node.Child1);
-          hasAxis = false;
-          break;
-        case AstType.ExprFilter:
-          // path and expr index will be backfilled
-          state.PathIdx = compiler.AddPath(new(PathOpType.Filter));
-          compiler.AddPath(new(PathOpType.Expr));
-          compiler.QueueExpr(node.Child0);
-          compiler.QueueExpr(node.Child1);
-          break;
-        case AstType.Union:
-          // path indices will be backfilled
-          state.PathIdx = compiler.AddPath(new(PathOpType.Union));
-          compiler.QueuePath(node.Child0);
-          compiler.QueuePath(node.Child1);
-          hasAxis = false;
-          break;
-        case AstType.Value or AstType.FuncCall:
-          // expr index will be backfilled
-          state.PathIdx = compiler.AddPath(new(PathOpType.Expr));
-          compiler.QueueExpr(node);
-          break;
-        default:
-          throw new InvalidOperationException($"{node.Type}");
-      }
+      step.Axis = node;
+      return (step, node.Prev);
     }
+
+    while (node?.Type is AstType.PathFilter)
+    {
+      step.Filters ??= [];
+      step.Filters.Add(node);
+      node = node.Prev;
+    }
+    step.Filters?.Reverse();
+
+    if (node?.Type is AstType.NodeTest or AstType.ProcType)
+    {
+      step.NodeTest = node;
+      node = node.Prev;
+    }
+
+    if (node?.Type is AstType.Axis)
+    {
+      step.Axis = node;
+      node = node.Prev;
+    }
+
+    if (node?.Type is AstType.Sep && node.Token.Type is TokenType.OpSep)
+      node = node.Prev;
+
+    if (step.Axis == null && step.NodeTest == null)
+      throw new InvalidOperationException();
+
+    return (step, node);
   }
 
-  // backfill filter and union target indices
-  private struct PathBackfillPass() : ICompilerPass
+  private static ExecPathOp CompileStep(PathStep step, ExecPathOp path)
   {
-    public void Visit(ref Compiler compiler, AstNode node, State state)
+    var axis = AxisType.Child;
+    switch (step.Axis?.Type)
     {
-      switch (node.Type)
-      {
-        case AstType.PathFilter:
-          compiler.paths[state.PathIdx] = new(PathOpType.Filter) { Expr = compiler.ValOpIndex(node.Child1) };
-          break;
-        case AstType.ExprFilter:
-          compiler.paths[state.PathIdx] = new(PathOpType.Filter) { Expr = compiler.ValOpIndex(node.Child1) };
-          compiler.paths[state.PathIdx + 1] = new(PathOpType.Expr) { Expr = compiler.ValOpIndex(node.Child0) };
-          break;
-        case AstType.Union:
-          compiler.paths[state.PathIdx] = new(PathOpType.Union)
-          {
-            UnionL = compiler.PathStart(node.Child0),
-            UnionR = compiler.PathStart(node.Child1),
-          };
-          break;
-        case AstType.Value or AstType.FuncCall:
-          compiler.paths[state.PathIdx] = new(PathOpType.Expr) { Expr = compiler.ValOpIndex(node.Child0) };
-          break;
-      }
+      case AstType.Root:
+        return step.Axis.Token.Type switch
+        {
+          TokenType.OpSep => new ExecPathOpRoot(),
+          TokenType.OpSepDesc => new ExecPathOpAxisDescendantOrSelf(new ExecPathOpRoot()),
+          _ => throw new InvalidOperationException($"{step.Axis.Token.Type}"),
+        };
+      case AstType.Sep:
+        axis = step.Axis.Token.Type switch
+        {
+          TokenType.OpSepDesc => AxisType.DescendantOrSelf,
+          _ => throw new InvalidOperationException($"{step.Axis.Token.Type}"),
+        };
+        break;
+      case AstType.ExprFilter:
+        path = new ExecPathOpExpr(step.Axis.InExpr);
+        axis = AxisType.Self;
+        break;
+      case AstType.Axis:
+        axis = step.Axis.Token.Type switch
+        {
+          TokenType.Attr => AxisType.Attribute,
+          TokenType.Self => AxisType.Self,
+          TokenType.Parent => AxisType.Parent,
+          TokenType.AxisName => XPath.ParseAxisType(step.Axis.Token.String),
+          _ => throw new InvalidOperationException($"{step.Axis.Token.Type}"),
+        };
+        break;
+      case AstType.Union:
+        return new ExecPathOpUnion(step.Axis.UnionL, step.Axis.UnionR);
+      case AstType.PathFilter:
+      case AstType.Value:
+      case AstType.FuncCall:
+      case AstType.BoolOp:
+      case AstType.CompareOp:
+      case AstType.MathOp:
+      case AstType.Negate:
+        return new ExecPathOpExpr(step.Axis.Expr);
+      case null:
+        break;
+      case AstType.NodeTest:
+      case AstType.ProcType:
+      case AstType.ArgList:
+      default:
+        throw new InvalidOperationException($"{step.Axis.Type}");
     }
+
+    path ??= new ExecPathOpContext();
+
+    if (path.Forward != axis.IsForward)
+      path = new ExecPathOpReverse(path);
+    if (axis != AxisType.Self)
+      path = ExecPathOpAxis.Make(path, axis);
+
+    switch (step.NodeTest?.Type)
+    {
+      case AstType.NodeTest:
+        path = step.NodeTest.Token.Type switch
+        {
+          TokenType.NodeType =>
+            new ExecPathOpNodeType(path,
+              XPath.ParseNodeType(step.NodeTest.Token.String)),
+          TokenType.NtAny =>
+            new ExecPathOpNameTest(path, axis.PrincipalType, "", ""),
+          TokenType.NtAnyNs =>
+            new ExecPathOpNameTest(path, axis.PrincipalType,
+              TokNs(step.NodeTest.Token), ""),
+          TokenType.NtName =>
+            new ExecPathOpNameTest(path, axis.PrincipalType,
+              TokNs(step.NodeTest.Token), TokName(step.NodeTest.Token)),
+          _ => throw new InvalidOperationException($"{step.NodeTest.Token.Type}"),
+        };
+        break;
+      case AstType.ProcType:
+        path = new ExecPathOpNameTest(path, XPType.ProcInst, "",
+          step.NodeTest.Token.String[1..^1]);
+        break;
+      case null: break;
+      default:
+        throw new InvalidOperationException($"{step.NodeTest.Type}");
+    }
+
+    var fcount = step.Filters?.Count ?? 0;
+    for (var i = 0; i < fcount; i++)
+      path = new ExecPathOpFilter(path, step.Filters[i].Expr);
+
+    if (axis.CanDupe)
+      path = new ExecPathOpDedupe(path);
+
+    return path;
   }
 
   private static string TokNs(Token tok)
   {
-    var str = tok.String;
-    var idx = str.IndexOf(':');
+    var idx = tok.String.IndexOf(':');
     if (idx == -1)
       return "";
-    return str[..idx];
+    return tok.String[..idx];
   }
+  private static string TokName(Token tok) =>
+    tok.String[(tok.String.IndexOf(':') + 1)..];
 
-  private static string TokName(Token tok)
+  private static ExecPathOp CompilePath(AstNode astNode)
   {
-    var str = tok.String;
-    var idx = str.IndexOf(':');
-    return str[(idx + 1)..];
-  }
-
-  private void WalkExpr<T>(AstNode node, ref T visitor) where T : struct, ICompilerPass, allows ref struct
-  {
-    switch (node.Type)
+    var node = BuildPath(astNode);
+    var steps = new List<PathStep>();
+    while (node != null)
     {
-      // path nodes start a new path. don't walk, just visit
-      case AstType.Root:
-      case AstType.Sep:
-      case AstType.Axis:
-      case AstType.NodeTest:
-      case AstType.ProcType:
-      case AstType.PathFilter:
-      case AstType.ExprFilter:
-      case AstType.Union:
-      case AstType.Value: // Value is a leaf
-        visitor.Visit(ref this, node, StateOf(node));
-        break;
-
-      case AstType.FuncCall:
-        visitor.Visit(ref this, node, StateOf(node));
-        if (node.Child0 != null)
-          WalkExpr(node.Child0, ref visitor);
-        break;
-      case AstType.ArgList:
-      case AstType.BoolOp:
-      case AstType.CompareOp:
-      case AstType.MathOp:
-        visitor.Visit(ref this, node, StateOf(node));
-        WalkExpr(node.Child0, ref visitor);
-        WalkExpr(node.Child1, ref visitor);
-        break;
-      case AstType.Negate:
-        visitor.Visit(ref this, node, StateOf(node));
-        WalkExpr(node.Child0, ref visitor);
-        break;
-      default:
-        throw new InvalidOperationException($"{node.Type}");
+      var (step, prev) = BuildStep(node);
+      steps.Add(step);
+      node = prev;
     }
-  }
+    steps.Reverse();
 
-  private void WalkPath<T>(AstNode node, ref T visitor) where T : struct, ICompilerPass, allows ref struct
-  {
-    switch (node.Type)
-    {
-      case AstType.Root:
-      case AstType.Axis:
-        if (node.Child0 != null)
-          WalkPath(node.Child0, ref visitor);
-        visitor.Visit(ref this, node, StateOf(node));
-        break;
-      case AstType.Sep:
-        WalkPath(node.Child1, ref visitor);
-        visitor.Visit(ref this, node, StateOf(node));
-        WalkPath(node.Child0, ref visitor);
-        break;
-      case AstType.NodeTest:
-      case AstType.ProcType:
-      case AstType.Union: // union paths are separate
-        visitor.Visit(ref this, node, StateOf(node));
-        break;
-      case AstType.PathFilter:
-        visitor.Visit(ref this, node, StateOf(node));
-        WalkPath(node.Child0, ref visitor); // walk parent path, but not predicate expression
-        break;
-      case AstType.ExprFilter:
-        // both children are treated as expressions
-        visitor.Visit(ref this, node, StateOf(node));
-        break;
-      // variables and user funcs could produce nodes, so they are allowed as roots
-      case AstType.Value when node.Token.Type is TokenType.VarRef:
-      case AstType.FuncCall:
-        visitor.Visit(ref this, node, StateOf(node));
-        break;
-      // expression nodes that couldn't produce nodes should not be children
-      case AstType.Value:
-      case AstType.ArgList:
-      case AstType.BoolOp:
-      case AstType.CompareOp:
-      case AstType.MathOp:
-      case AstType.Negate:
-        throw new InvalidOperationException($"{node.Type} cannot be in a Path");
-      default:
-        throw new InvalidOperationException($"Unknown Ast node {node.Type}");
-    }
-  }
+    ExecPathOp path = null;
+    foreach (var step in steps)
+      path = CompileStep(step, path);
 
-  private interface ICompilerPass
-  {
-    public void Visit(ref Compiler compiler, AstNode node, State state);
+    if (!path.Forward)
+      path = new ExecPathOpReverse(path);
+
+    return path;
   }
 }

@@ -1,55 +1,58 @@
 
 using System;
 using XPP.Doc;
-using XPP.Utils;
 
 namespace XPP.Path;
 
-public ref partial struct Exec
+public class ExecExprOpFunc(LibraryFunc Func, ExecExprOp[] Args) : ExecExprOp()
 {
-  private Value FuncValue(int idx, PathContext ctx)
+  public readonly LibraryFunc Func = Func;
+  public readonly ExecExprOp[] Args = Args;
+  private readonly ExecResult[] argVals = new ExecResult[Args.Length];
+
+  private delegate ExecResult FuncDelegate(ExecPathCtx ctx, ExecResult[] args);
+  private FuncDelegate funcDelegate;
+
+  public override ExecResult Value(ExecPathCtx context)
   {
-    ref readonly var op = ref path.Vals[idx];
-    var (off, len) = op.Args.GetOffsetAndLength(path.Vals.Length);
-    using var argb = argBuf.Borrow(len);
-    var args = argb.Span;
-    for (var i = 0; i < len; i++)
-      args[i] = GetValue(off + i, ctx);
-    return op.Func switch
+    funcDelegate ??= Func switch
     {
-      LibraryFunc.Last => LibraryFuncLast(args, ctx),
-      LibraryFunc.Position => LibraryFuncPosition(args, ctx),
-      LibraryFunc.Count => LibraryFuncCount(args, ctx),
-      LibraryFunc.Id => LibraryFuncId(args, ctx),
-      LibraryFunc.LocalName => LibraryFuncLocalName(args, ctx),
-      LibraryFunc.NamespaceUri => LibraryFuncNamespaceUri(args, ctx),
-      LibraryFunc.Name => LibraryFuncName(args, ctx),
-      LibraryFunc.String => LibraryFuncString(args, ctx),
-      LibraryFunc.Concat => LibraryFuncConcat(args, ctx),
-      LibraryFunc.StartsWith => LibraryFuncStartsWith(args, ctx),
-      LibraryFunc.Contains => LibraryFuncContains(args, ctx),
-      LibraryFunc.SubstringBefore => LibraryFuncSubstringBefore(args, ctx),
-      LibraryFunc.SubstringAfter => LibraryFuncSubstringAfter(args, ctx),
-      LibraryFunc.Substring => LibraryFuncSubstring(args, ctx),
-      LibraryFunc.StringLength => LibraryFuncStringLength(args, ctx),
-      LibraryFunc.NormalizeSpace => LibraryFuncNormalizeSpace(args, ctx),
-      LibraryFunc.Translate => LibraryFuncTranslate(args, ctx),
-      LibraryFunc.Boolean => LibraryFuncBoolean(args, ctx),
-      LibraryFunc.Not => LibraryFuncNot(args, ctx),
-      LibraryFunc.True => LibraryFuncTrue(args, ctx),
-      LibraryFunc.False => LibraryFuncFalse(args, ctx),
-      LibraryFunc.Lang => LibraryFuncLang(args, ctx),
-      LibraryFunc.Number => LibraryFuncNumber(args, ctx),
-      LibraryFunc.Sum => LibraryFuncSum(args, ctx),
-      LibraryFunc.Floor => LibraryFuncFloor(args, ctx),
-      LibraryFunc.Ceiling => LibraryFuncCeiling(args, ctx),
-      LibraryFunc.Round => LibraryFuncRound(args, ctx),
-      _ => throw new InvalidOperationException($"{op.Func}"),
+      LibraryFunc.Last => LibraryFuncLast,
+      LibraryFunc.Position => LibraryFuncPosition,
+      LibraryFunc.Count => LibraryFuncCount,
+      LibraryFunc.Id => LibraryFuncId,
+      LibraryFunc.LocalName => LibraryFuncLocalName,
+      LibraryFunc.NamespaceUri => LibraryFuncNamespaceUri,
+      LibraryFunc.Name => LibraryFuncName,
+      LibraryFunc.String => LibraryFuncString,
+      LibraryFunc.Concat => LibraryFuncConcat,
+      LibraryFunc.StartsWith => LibraryFuncStartsWith,
+      LibraryFunc.Contains => LibraryFuncContains,
+      LibraryFunc.SubstringBefore => LibraryFuncSubstringBefore,
+      LibraryFunc.SubstringAfter => LibraryFuncSubstringAfter,
+      LibraryFunc.Substring => LibraryFuncSubstring,
+      LibraryFunc.StringLength => LibraryFuncStringLength,
+      LibraryFunc.NormalizeSpace => LibraryFuncNormalizeSpace,
+      LibraryFunc.Translate => LibraryFuncTranslate,
+      LibraryFunc.Boolean => LibraryFuncBoolean,
+      LibraryFunc.Not => LibraryFuncNot,
+      LibraryFunc.True => LibraryFuncTrue,
+      LibraryFunc.False => LibraryFuncFalse,
+      LibraryFunc.Lang => LibraryFuncLang,
+      LibraryFunc.Number => LibraryFuncNumber,
+      LibraryFunc.Sum => LibraryFuncSum,
+      LibraryFunc.Floor => LibraryFuncFloor,
+      LibraryFunc.Ceiling => LibraryFuncCeiling,
+      LibraryFunc.Round => LibraryFuncRound,
+      _ => throw new InvalidOperationException($"{Func}"),
     };
+    for (var i = 0; i < Args.Length; i++)
+      argVals[i] = Args[i].Value(context);
+    return funcDelegate(context, argVals);
   }
 
   private static void AssertArgType(
-    string fname, int argi, XPValueType expected, ref readonly Value val)
+    string fname, int argi, XPValueType expected, ref readonly ExecResult val)
   {
     if (val.Type == expected)
       return;
@@ -57,53 +60,54 @@ public ref partial struct Exec
       $"argument {argi} to {fname} must be {expected}, not {val.Type}");
   }
 
-  private Value LibraryFuncLast(scoped Span<Value> args, PathContext ctx) =>
-    new(ctx.Count);
-  private Value LibraryFuncPosition(scoped Span<Value> args, PathContext ctx) =>
+  private ExecResult LibraryFuncLast(ExecPathCtx ctx, ExecResult[] args) =>
+    new(ctx.Set.Length);
+  private ExecResult LibraryFuncPosition(ExecPathCtx ctx, ExecResult[] args) =>
     new(ctx.Position + 1);
 
-  private Value LibraryFuncCount(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncCount(ExecPathCtx ctx, ExecResult[] args)
   {
     AssertArgType("count", 0, XPValueType.NodeSet, in args[0]);
 
-    return new(PathResult(args[0].NodeSet).Length);
+    var count = 0;
+    foreach (var node in args[0].NodeSet)
+      count++;
+
+    return new(count);
   }
 
-  private Value LibraryFuncId(scoped Span<Value> args, PathContext ctx) =>
+  private ExecResult LibraryFuncId(ExecPathCtx ctx, ExecResult[] args) =>
     throw new NotImplementedException();
 
-  private Value LibraryFuncLocalName(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncLocalName(ExecPathCtx ctx, ExecResult[] args)
   {
     var node = ctx.Nav.Node;
     if (args.Length > 0)
     {
       AssertArgType("local-name", 0, XPValueType.NodeSet, in args[0]);
-      var nodes = PathResult(args[0].NodeSet);
-      node = nodes.Length > 0 ? nodes[0].Nav.Node : XPNodeRef.Invalid;
+      node = args[0].NodeSet.Next(out var anode) ? anode.Nav.Node : XPNodeRef.Invalid;
     }
     return new(node.Name.Local);
   }
 
-  private Value LibraryFuncNamespaceUri(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncNamespaceUri(ExecPathCtx ctx, ExecResult[] args)
   {
     var node = ctx.Nav.Node;
     if (args.Length > 0)
     {
       AssertArgType("namespace-uri", 0, XPValueType.NodeSet, in args[0]);
-      var nodes = PathResult(args[0].NodeSet);
-      node = nodes.Length > 0 ? nodes[0].Nav.Node : XPNodeRef.Invalid;
+      node = args[0].NodeSet.Next(out var anode) ? anode.Nav.Node : XPNodeRef.Invalid;
     }
     return new(node.Name.NsUri);
   }
 
-  private Value LibraryFuncName(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncName(ExecPathCtx ctx, ExecResult[] args)
   {
     var node = ctx.Nav.Node;
     if (args.Length > 0)
     {
       AssertArgType("name", 0, XPValueType.NodeSet, in args[0]);
-      var nodes = PathResult(args[0].NodeSet);
-      node = nodes.Length > 0 ? nodes[0].Nav.Node : XPNodeRef.Invalid;
+      node = args[0].NodeSet.Next(out var anode) ? anode.Nav.Node : XPNodeRef.Invalid;
     }
     var name = node.Name;
     if (name.Prefix.Length > 0)
@@ -111,40 +115,40 @@ public ref partial struct Exec
     return new(name.Local);
   }
 
-  private Value LibraryFuncString(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncString(ExecPathCtx ctx, ExecResult[] args)
   {
     if (args.Length > 0)
-      return new(StringValue(args[0]));
-    return new(NodeStringValue(ctx.Nav));
+      return new(args[0].StringValue);
+    return new(ExecValue.NodeStringValue(ctx.Nav.Node));
   }
 
-  private Value LibraryFuncConcat(scoped Span<Value> args, PathContext ctx) =>
+  private ExecResult LibraryFuncConcat(ExecPathCtx ctx, ExecResult[] args) =>
     throw new NotImplementedException();
-  private Value LibraryFuncStartsWith(scoped Span<Value> args, PathContext ctx) =>
-    new(StringValue(args[0]).StartsWith(StringValue(args[1])));
-  private Value LibraryFuncContains(scoped Span<Value> args, PathContext ctx) =>
-    new(StringValue(args[0]).Contains(StringValue(args[1])));
+  private ExecResult LibraryFuncStartsWith(ExecPathCtx ctx, ExecResult[] args) =>
+    new(args[0].StringValue.StartsWith(args[1].StringValue));
+  private ExecResult LibraryFuncContains(ExecPathCtx ctx, ExecResult[] args) =>
+    new(args[0].StringValue.Contains(args[1].StringValue));
 
-  private Value LibraryFuncSubstringBefore(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncSubstringBefore(ExecPathCtx ctx, ExecResult[] args)
   {
-    var arg0 = StringValue(args[0]);
-    var idx = arg0.IndexOf(StringValue(args[1]));
+    var arg0 = args[0].StringValue;
+    var idx = arg0.IndexOf(args[1].StringValue);
     return new(idx == -1 ? "" : arg0[..idx]);
   }
 
-  private Value LibraryFuncSubstringAfter(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncSubstringAfter(ExecPathCtx ctx, ExecResult[] args)
   {
-    var arg0 = StringValue(args[0]);
-    var arg1 = StringValue(args[1]);
+    var arg0 = args[0].StringValue;
+    var arg1 = args[1].StringValue;
     var idx = arg0.IndexOf(arg1);
     return new(idx == -1 ? "" : arg0[(idx + arg1.Length)..]);
   }
 
-  private Value LibraryFuncSubstring(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncSubstring(ExecPathCtx ctx, ExecResult[] args)
   {
-    var str = StringValue(args[0]);
-    var min = (long)(int)Math.Round(NumberValue(args[1]) - 1);
-    var len = args.Length > 2 ? (long)(int)Math.Round(NumberValue(args[1])) : str.Length;
+    var str = args[0].StringValue;
+    var min = (long)(int)Math.Round(args[1].NumberValue - 1);
+    var len = args.Length > 2 ? (long)(int)Math.Round(args[1].NumberValue) : str.Length;
 
     var imin = (int)Math.Clamp(min, 0, str.Length);
     var imax = (int)Math.Clamp(min + len, 0, str.Length);
@@ -153,17 +157,20 @@ public ref partial struct Exec
     return new(str[imin..imax]);
   }
 
-  private Value LibraryFuncStringLength(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncStringLength(ExecPathCtx ctx, ExecResult[] args)
   {
     if (args.Length > 0)
-      return new(StringValue(args[0]).Length);
-    return new(NodeStringValue(ctx.Nav).Length);
+      return new(args[0].StringValue.Length);
+    return new(ExecValue.NodeStringValue(ctx.Nav.Node).Length);
   }
 
-  private Value LibraryFuncNormalizeSpace(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncNormalizeSpace(ExecPathCtx ctx, ExecResult[] args)
   {
-    var str = args.Length > 0 ? StringValue(args[0]) : NodeStringValue(ctx.Nav);
+    var str = args.Length > 0
+      ? args[0].StringValue
+      : ExecValue.NodeStringValue(ctx.Nav.Node);
 
+    var res = new char[str.Length];
     var len = 0;
     var nslen = 0;
     var hassp = true;
@@ -176,43 +183,44 @@ public ref partial struct Exec
         if (hadsp) continue;
         c = ' ';
       }
-      dataBuf[len++] = c;
+      res[len++] = c;
       if (!hassp) nslen = len;
     }
-    return new(dataBuf[..nslen]);
+    return new(res.AsSpan(nslen));
   }
 
-  private Value LibraryFuncTranslate(scoped Span<Value> args, PathContext ctx) =>
+  private ExecResult LibraryFuncTranslate(ExecPathCtx ctx, ExecResult[] args) =>
     throw new NotSupportedException("translate not supported");
-  private Value LibraryFuncBoolean(scoped Span<Value> args, PathContext ctx) =>
-    new(BoolValue(args[0]));
-  private Value LibraryFuncNot(scoped Span<Value> args, PathContext ctx) =>
-    new(!BoolValue(args[0]));
-  private Value LibraryFuncTrue(scoped Span<Value> args, PathContext ctx) => new(true);
-  private Value LibraryFuncFalse(scoped Span<Value> args, PathContext ctx) => new(false);
-  private Value LibraryFuncLang(scoped Span<Value> args, PathContext ctx) =>
+  private ExecResult LibraryFuncBoolean(ExecPathCtx ctx, ExecResult[] args) =>
+    new(args[0].BoolValue);
+  private ExecResult LibraryFuncNot(ExecPathCtx ctx, ExecResult[] args) =>
+    new(!args[0].BoolValue);
+  private ExecResult LibraryFuncTrue(ExecPathCtx ctx, ExecResult[] args) => new(true);
+  private ExecResult LibraryFuncFalse(ExecPathCtx ctx, ExecResult[] args) => new(false);
+  private ExecResult LibraryFuncLang(ExecPathCtx ctx, ExecResult[] args) =>
     throw new NotSupportedException("lang not supported");
 
-  private Value LibraryFuncNumber(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncNumber(ExecPathCtx ctx, ExecResult[] args)
   {
     if (args.Length > 0)
-      return new(NumberValue(args[0]));
-    return new(NodeNumberValue(ctx.Nav));
+      return new(args[0].NumberValue);
+    return new(ExecValue.NodeNumberValue(ctx.Nav.Node));
   }
 
-  private Value LibraryFuncSum(scoped Span<Value> args, PathContext ctx)
+  private ExecResult LibraryFuncSum(ExecPathCtx ctx, ExecResult[] args)
   {
     AssertArgType("sum", 0, XPValueType.NodeSet, in args[0]);
     var sum = 0.0;
-    foreach (var node in PathResult(args[0].NodeSet))
-      sum += NodeNumberValue(node.Nav);
+    foreach (var node in args[0].NodeSet) {
+      sum += ExecValue.NodeNumberValue(node);
+    }
     return new(sum);
   }
 
-  private Value LibraryFuncFloor(scoped Span<Value> args, PathContext ctx) =>
-    new(Math.Floor(NumberValue(args[0])));
-  private Value LibraryFuncCeiling(scoped Span<Value> args, PathContext ctx) =>
-    new(Math.Ceiling(NumberValue(args[0])));
-  private Value LibraryFuncRound(scoped Span<Value> args, PathContext ctx) =>
-    new(Math.Round(NumberValue(args[0])));
+  private ExecResult LibraryFuncFloor(ExecPathCtx ctx, ExecResult[] args) =>
+    new(Math.Floor(args[0].NumberValue));
+  private ExecResult LibraryFuncCeiling(ExecPathCtx ctx, ExecResult[] args) =>
+    new(Math.Ceiling(args[0].NumberValue));
+  private ExecResult LibraryFuncRound(ExecPathCtx ctx, ExecResult[] args) =>
+    new(Math.Round(args[0].NumberValue));
 }

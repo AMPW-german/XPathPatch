@@ -1,10 +1,11 @@
 
 using System;
+using System.Text;
 using XPP.Path;
 
 namespace XPP.Doc;
 
-public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
+public readonly struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
 {
   public static readonly XPNavigator Invalid = new(XPNodeRef.Invalid);
 
@@ -49,8 +50,10 @@ public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
   public bool LastChild(out XPNavigator nav) => Make(Node.LastContent, out nav);
   public bool NextSibling(out XPNavigator nav) =>
     Make(Node.Type.IsContent ? Node.NextSibling : XPNodeRef.Invalid, out nav);
-  public bool PreviousSibling(out XPNavigator nav) =>
-    Make(Node.Type.IsContent ? Node.PrevSibling : XPNodeRef.Invalid, out nav);
+  public bool PreviousSibling(out XPNavigator nav) {
+    if (!Node.Valid) throw new InvalidOperationException();
+    return Make(Node.Type.IsContent ? Node.PrevSibling : XPNodeRef.Invalid, out nav);
+  }
   public bool FirstAttribute(out XPNavigator nav) =>
     FirstOfType(Node.FirstAttr, XPType.Attribute, out nav);
   public bool NextAttribute(out XPNavigator nav) =>
@@ -72,31 +75,26 @@ public struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
   private static bool Make(XPNodeRef node, out XPNavigator nav) =>
     (nav = new(node)).Node.Valid;
 
-  public int StringValue(Span<char> buffer) => BuildStringValue(Node, buffer);
+  public void StringValue(StringBuilder sb) => BuildStringValue(Node, sb);
 
-  private static int BuildStringValue(XPNodeRef node, Span<char> buffer)
+  private static void BuildStringValue(XPNodeRef node, StringBuilder sb)
   {
     if (!node.Valid)
-      return 0;
+      return;
     var type = node.Type;
-    var length = 0;
     if (type is XPType.Comment)
     {
       // noop
     }
     else if (type.HasValue)
-    {
-      var val = node.Value;
-      val.CopyTo(buffer);
-      length += val.Length;
-    }
+      sb.Append(node.Value);
     else if (type.CanHaveContent)
-      length = BuildStringValue(node.FirstContent, buffer);
+      BuildStringValue(node.FirstContent, sb);
 
     if (!type.IsContent)
-      return length;
+      return;
 
-    return length + BuildStringValue(node.FirstContent, buffer[length..]);
+    BuildStringValue(node.FirstContent, sb);
   }
 
   public bool SameAs(XPNavigator other) => Node.SameAs(other.Node);

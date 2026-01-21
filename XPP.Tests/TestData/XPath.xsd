@@ -56,42 +56,6 @@
       <xs:enumeration value="Negate" />
     </xs:restriction>
   </xs:simpleType>
-  <xs:simpleType name="PathOpType" final="restriction">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="Context" />
-      <xs:enumeration value="Root" />
-      <xs:enumeration value="Union" />
-      <xs:enumeration value="Expr" />
-      <xs:enumeration value="Axis" />
-      <xs:enumeration value="NodeType" />
-      <xs:enumeration value="NameTest" />
-      <xs:enumeration value="Filter" />
-    </xs:restriction>
-  </xs:simpleType>
-  <xs:simpleType name="ValOpType" final="restriction">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="Number" />
-      <xs:enumeration value="String" />
-      <xs:enumeration value="Variable" />
-      <xs:enumeration value="Path" />
-      <xs:enumeration value="Negate" />
-      <xs:enumeration value="And" />
-      <xs:enumeration value="Or" />
-      <xs:enumeration value="Eq" />
-      <xs:enumeration value="Neq" />
-      <xs:enumeration value="Lt" />
-      <xs:enumeration value="Lte" />
-      <xs:enumeration value="Gt" />
-      <xs:enumeration value="Gte" />
-      <xs:enumeration value="Add" />
-      <xs:enumeration value="Sub" />
-      <xs:enumeration value="Mult" />
-      <xs:enumeration value="Mod" />
-      <xs:enumeration value="Div" />
-      <xs:enumeration value="Func" />
-      <xs:enumeration value="UserFunc" />
-    </xs:restriction>
-  </xs:simpleType>
   <xs:simpleType name="LibraryFunc" final="restriction">
     <xs:restriction base="xs:string">
       <xs:enumeration value="Last" />
@@ -148,6 +112,45 @@
       <xs:enumeration value="Node" />
     </xs:restriction>
   </xs:simpleType>
+  <xs:simpleType name="CExprType" final="restriction">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Path" />
+      <xs:enumeration value="Constant" />
+      <xs:enumeration value="Negate" />
+      <xs:enumeration value="Logic" />
+      <xs:enumeration value="Compare" />
+      <xs:enumeration value="Math" />
+      <xs:enumeration value="Func" />
+      <xs:enumeration value="Variable" />
+      <xs:enumeration value="UserFunc" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="CPathType" final="restriction">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Context" />
+      <xs:enumeration value="Root" />
+      <xs:enumeration value="Reverse" />
+      <xs:enumeration value="Dedupe" />
+      <xs:enumeration value="Union" />
+      <xs:enumeration value="Expr" />
+      <xs:enumeration value="NodeType" />
+      <xs:enumeration value="NameTest" />
+      <xs:enumeration value="Filter" />
+      <xs:enumeration value="Axis" />
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="XPType" final="restriction">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Document" />
+      <xs:enumeration value="Element" />
+      <xs:enumeration value="Text" />
+      <xs:enumeration value="CData" />
+      <xs:enumeration value="ProcInst" />
+      <xs:enumeration value="Comment" />
+      <xs:enumeration value="Attribute" />
+      <xs:enumeration value="Namespace" />
+    </xs:restriction>
+  </xs:simpleType>
   <xs:element name="TestData">
     <xs:complexType>
       <xs:sequence>
@@ -188,9 +191,10 @@
       <xs:element name="R" type="XPathCExpr" minOccurs="0" />
       <xs:element name="Arg" type="XPathCExpr" minOccurs="0" maxOccurs="unbounded" />
     </xs:sequence>
-    <xs:attribute name="T" type="ValOpType" use="required" />
+    <xs:attribute name="T" type="CExprType" use="required" />
     <xs:attribute name="Str" type="xs:string" />
     <xs:attribute name="Num" type="xs:double" />
+    <xs:attribute name="Op" type="TokenType" />
     <xs:attribute name="Fn" type="LibraryFunc" />
   </xs:complexType>
   <xs:complexType name="XPathCPath">
@@ -211,12 +215,10 @@
       </xs:element>
       <xs:element name="Expr" minOccurs="0" type="XPathCExpr" />
     </xs:sequence>
-    <xs:attribute name="T" type="PathOpType" use="required" />
-    <xs:attribute name="Reo" type="xs:boolean" />
+    <xs:attribute name="T" type="CPathType" use="required" />
     <xs:attribute name="Fwd" type="xs:boolean" />
-    <xs:attribute name="Dd" type="xs:boolean" />
-    <xs:attribute name="Rev" type="xs:boolean" />
     <xs:attribute name="Ax" type="AxisType" />
+    <xs:attribute name="Pt" type="XPType" />
     <xs:attribute name="Nt" type="NodeType" />
     <xs:attribute name="Ns" type="xs:string" />
     <xs:attribute name="N" type="xs:string" />

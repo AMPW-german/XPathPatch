@@ -57,39 +57,15 @@ public static class Program
       using (Time("XPDocument Import"))
       {
         foreach (var file in fileData)
-          xproot.Import(XmlReader.Create(new MemoryStream(file), new() { IgnoreWhitespace = true }));
+          xproot.Import(XmlReader.Create(new MemoryStream(file)));
       }
 
       const int EVAL_ITERS = 1;
       using (Time("XPDocument Eval"))
       {
-        // Path.ExecValue res = default;
-        // for (var i = 0; i < EVAL_ITERS; i++)
-        //   foreach (var val in countXpp.Exec(xproot))
-        //     res = val;
-        // Console.WriteLine($"XPP {res.Number}");
-
-        var xpath = new ExecExprOpTempCount(
-          new ExecExprOpPath(
-            new ExecPathOpUnion(
-              new ExecPathOpNameTest(
-                new ExecPathOpAxisChild(
-                  new ExecPathOpAxisDescendantOrSelf(
-                    new ExecPathOpRoot()
-                  )
-                ),
-               XPType.Element, "", ""),
-              new ExecPathOpNameTest(
-                new ExecPathOpAxisAttribute(
-                  new ExecPathOpAxisDescendantOrSelf(
-                    new ExecPathOpRoot()
-                  )
-                ),
-                XPType.Attribute, "", ""))));
-
-        ExecValue2 val = default;
+        ExecResult val = default;
         for (var i = 0; i < EVAL_ITERS; i++)
-          val = xpath.Value(new(xproot.Nav, ExecCtxSet.One, 0));
+          val = countXpp.Exec(xproot);
         Console.WriteLine(val.Number);
       }
     }

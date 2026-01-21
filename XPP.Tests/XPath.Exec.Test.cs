@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Xml;
 using XPP.Doc;
 using XPP.Path;
@@ -33,9 +34,14 @@ public partial class XPathTests
     }
   }
 
+  public static string ExecNodeDisplayName(MethodInfo method, object[] args) =>
+    $"{method.Name}({(args[1] as XPathExecTest)?.Path ?? "ERROR"})";
+
   [TestMethod]
-  [DynamicData(nameof(LoadExecTests), ["XPath.Exec.xml"])]
-  [DynamicData(nameof(LoadExecTests), ["XPath.Axis.xml"])]
+  [DynamicData(nameof(LoadExecTests), ["XPath.Exec.xml"],
+    DynamicDataDisplayName = nameof(ExecNodeDisplayName))]
+  [DynamicData(nameof(LoadExecTests), ["XPath.Axis.xml"],
+    DynamicDataDisplayName = nameof(ExecNodeDisplayName))]
   public void TestExecNode(XmlElement srcDoc, XPathExecTest test, Exception ex = null)
   {
     if (ex != null)

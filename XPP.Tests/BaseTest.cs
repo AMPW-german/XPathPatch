@@ -257,6 +257,6 @@ public class TreeComparer(string title)
   public void Assert()
   {
     if (!match)
-      throw new InvalidOperationException($"\n{sb}");
+      throw new AssertFailedException($"\n{sb}");
   }
 }

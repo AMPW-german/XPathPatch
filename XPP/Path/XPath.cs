@@ -1,32 +1,22 @@
 
-using System;
 using XPP.Doc;
 
 namespace XPP.Path;
 
 public partial class XPath
 {
-  public const int MAX_LENGTH = 1024;
   public readonly string Source;
-  public readonly PathOp[] Paths;
-  public readonly ValOp[] Vals;
+  public readonly ExecExprOp Compiled;
 
-  private XPath(string source, ReadOnlySpan<PathOp> paths, ReadOnlySpan<ValOp> vals)
+  private XPath(string source, ExecExprOp compiled)
   {
     Source = source;
-    Paths = paths.ToArray();
-    Vals = vals.ToArray();
+    Compiled = compiled;
   }
 
-  public static XPath Parse(string source)
-  {
-    var nodes = Parser.Parse(source);
-    Compiler.Compile(nodes, out var paths, out var vals);
-    return new(source, paths, vals);
-  }
+  public static XPath Parse(string source) => new(source, Compiler.Compile(source));
 
-  public XPathExecution Exec(XPNodeRef ctx) => new(this, ctx);
+  public ExecResult Exec(XPNodeRef ctx) => Compiled.Evaluate(ctx);
 
-  public static XPathExecution Exec(string source, XPNodeRef ctx) =>
-    Parse(source).Exec(ctx);
+  public static ExecResult Exec(string source, XPNodeRef ctx) => Parse(source).Exec(ctx);
 }
