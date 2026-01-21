@@ -42,10 +42,10 @@ public partial class XPathAst
       t.Compare("Node", exp.Type == act.Type && exp.Value == astr,
         $"{exp.Type} '{exp.Value}'", $"{act.Type} '{astr}'");
     }
-    var (e, a) = (exp?.Left, act?.Child0);
+    var (e, a) = (exp?.Left, act?.Left);
     if (e != null || a != null)
       t.Child("Left", t => TreeCompare(t, e, a));
-    (e, a) = (exp?.Right, act?.Child1);
+    (e, a) = (exp?.Right, act?.Right);
     if (e != null || a != null)
       t.Child("Right", t => TreeCompare(t, e, a));
   }

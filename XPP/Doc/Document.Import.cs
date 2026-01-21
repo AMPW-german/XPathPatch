@@ -53,7 +53,11 @@ public partial class XPDocument
   internal XPNodeRef Import(XmlReader reader, Node parent, bool interior = false)
   {
     if (reader.Settings?.IgnoreWhitespace != true)
-      reader = XmlReader.Create(reader, new() { IgnoreWhitespace = true });
+    {
+      var settings = reader.Settings?.Clone() ?? new();
+      settings.IgnoreWhitespace = true;
+      reader = XmlReader.Create(reader, settings);
+    }
     while (reader.Read())
     {
       if (interior || reader.NodeType == XmlNodeType.Element)

@@ -11,7 +11,7 @@ public partial class XPDocument
     if (vnode.Node == null)
       return null;
     var node = Latest(vnode.Node, version);
-    if (!allowLate && node.DVersion > version)
+    if (!allowLate && node.Version > version)
       return null;
     return node;
   }
@@ -101,14 +101,14 @@ public partial struct XPNodeRef
   private XPNodeRef Make(XPDocument.Node node) =>
     node != null ? new(Doc, node, Version) : Invalid;
   private XPNodeRef MakeExact(XPDocument.Node node) =>
-    node != null ? new(Doc, node, node.DVersion) : Invalid;
+    node != null ? new(Doc, node, node.Version) : Invalid;
   private XPNodeRef MakeAt(XPDocument.Node node, int version) =>
     node != null ? new(Doc, node, version) : Invalid;
 
   public XPType Type => Latest?.Type ?? default;
   public XPName Name => Latest?.Name ?? new("", "", "");
   public string Value => Latest?.Value ?? "";
-  public int EditVersion => Latest?.DVersion ?? -1;
+  public int EditVersion => Latest?.Version ?? -1;
   public int Depth => Latest?.Depth ?? -1;
 
   public XPNodeRef Parent => Make(Latest?.Parent);

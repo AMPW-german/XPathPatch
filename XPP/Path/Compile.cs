@@ -31,22 +31,22 @@ public class Compiler
         };
       case AstType.FuncCall:
         var args = new List<ExecExprOp>();
-        BuildArgList(args, astNode.Child0);
+        BuildArgList(args, astNode.Left);
         var func = XPath.ParseLibraryFunc(astNode.Token.String);
         if (func == LibraryFunc.Invalid)
           return new ExecExprOpUserFunc(userContext, astNode.Token.String, [.. args]);
         return new ExecExprOpFunc(func, [.. args]);
       case AstType.BoolOp:
         return new ExecExprOpLogic(
-          CompileExpr(astNode.Child0), CompileExpr(astNode.Child1), astNode.Token.Type);
+          CompileExpr(astNode.Left), CompileExpr(astNode.Right), astNode.Token.Type);
       case AstType.CompareOp:
         return new ExecExprOpCompare(
-          CompileExpr(astNode.Child0), CompileExpr(astNode.Child1), astNode.Token.Type);
+          CompileExpr(astNode.Left), CompileExpr(astNode.Right), astNode.Token.Type);
       case AstType.MathOp:
         return new ExecExprOpMath(
-          CompileExpr(astNode.Child0), CompileExpr(astNode.Child1), astNode.Token.Type);
+          CompileExpr(astNode.Left), CompileExpr(astNode.Right), astNode.Token.Type);
       case AstType.Negate:
-        return new ExecExprOpNegate(CompileExpr(astNode.Child0));
+        return new ExecExprOpNegate(CompileExpr(astNode.Left));
       case AstType.ArgList:
       default:
         throw new InvalidOperationException($"{astNode.Type}");
@@ -59,8 +59,8 @@ public class Compiler
       return;
     if (astNode.Type is AstType.ArgList)
     {
-      BuildArgList(args, astNode.Child0);
-      BuildArgList(args, astNode.Child1);
+      BuildArgList(args, astNode.Left);
+      BuildArgList(args, astNode.Right);
     }
     else
       args.Add(CompileExpr(astNode));
@@ -85,27 +85,27 @@ public class Compiler
     {
       return res = astNode.Type switch
       {
-        AstType.Root => BuildPath(astNode.Child0, new(astNode)),
-        AstType.Sep => BuildPath(astNode.Child1,
-          new(astNode, BuildPath(astNode.Child0, usedPrev = prev))),
+        AstType.Root => BuildPath(astNode.Left, new(astNode)),
+        AstType.Sep => BuildPath(astNode.Right,
+          new(astNode, BuildPath(astNode.Left, usedPrev = prev))),
         AstType.Axis => astNode.Token.Type switch
         {
-          TokenType.AxisName => BuildPath(astNode.Child0, new(astNode, usedPrev = prev)),
-          TokenType.Attr => BuildPath(astNode.Child0, new(astNode, usedPrev = prev)),
+          TokenType.AxisName => BuildPath(astNode.Left, new(astNode, usedPrev = prev)),
+          TokenType.Attr => BuildPath(astNode.Left, new(astNode, usedPrev = prev)),
           TokenType.Self or TokenType.Parent => new(astNode, usedPrev = prev),
           _ => throw new InvalidOperationException($"{astNode.Token.Type}"),
         },
         AstType.NodeTest or AstType.ProcType => new(astNode, usedPrev = prev),
-        AstType.PathFilter => new(astNode, BuildPath(astNode.Child0, usedPrev = prev),
-          CompileExpr(astNode.Child1)),
-        AstType.ExprFilter => new(astNode, expr: CompileExpr(astNode.Child1))
+        AstType.PathFilter => new(astNode, BuildPath(astNode.Left, usedPrev = prev),
+          CompileExpr(astNode.Right)),
+        AstType.ExprFilter => new(astNode, expr: CompileExpr(astNode.Right))
         {
-          InExpr = CompileExpr(astNode.Child0),
+          InExpr = CompileExpr(astNode.Left),
         },
         AstType.Union => new(astNode)
         {
-          UnionL = CompilePath(astNode.Child0),
-          UnionR = CompilePath(astNode.Child1)
+          UnionL = CompilePath(astNode.Left),
+          UnionR = CompilePath(astNode.Right)
         },
         AstType.BoolOp or AstType.CompareOp or AstType.MathOp
         or AstType.Negate or AstType.FuncCall or AstType.Value =>

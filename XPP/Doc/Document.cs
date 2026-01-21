@@ -285,15 +285,15 @@ public partial class XPDocument
   {
     if (node == null)
       return null;
-    if (node.DVersion == maxVersion)
+    if (node.Version == maxVersion)
       return node;
-    while (node.DVersion < maxVersion && node.VNext is Node next)
+    while (node.Version < maxVersion && node.VNext is Node next)
     {
-      if (next.DVersion > maxVersion)
+      if (next.Version > maxVersion)
         break;
       node = next;
     }
-    while (node.DVersion > maxVersion && node.VPrev is Node prev)
+    while (node.Version > maxVersion && node.VPrev is Node prev)
       node = prev;
     return node;
   }
@@ -301,14 +301,14 @@ public partial class XPDocument
   private Node Current(Node node)
   {
     node = Latest(node);
-    if (node.DVersion == docVersion)
+    if (node.Version == docVersion)
       return node;
 
     // if the latest isn't on the current version, make a new node
     var newNode = new Node(node);
     newNode.VPrev = node;
     newNode.VNext = null;
-    newNode.DVersion = docVersion;
+    newNode.Version = docVersion;
     node.VNext = newNode;
 
     if (newNode.Depth == 0)
@@ -335,7 +335,7 @@ public partial class XPDocument
       PrevSibling = null,
       NextSibling = null,
 
-      DVersion = docVersion,
+      Version = docVersion,
 
       VPrev = null,
       VNext = null,
@@ -383,7 +383,7 @@ public partial class XPDocument
     public Node NextSibling;
 
     // version info
-    public int DVersion; // document version
+    public int Version; // document version
     // node list indices of versions of this node
     public Node VPrev;
     public Node VNext;
@@ -407,7 +407,7 @@ public partial class XPDocument
       LastAttr = other.LastAttr;
       PrevSibling = other.PrevSibling;
       NextSibling = other.NextSibling;
-      DVersion = other.DVersion;
+      Version = other.Version;
       VPrev = other.VPrev;
       VNext = other.VNext;
       Removed = other.Removed;

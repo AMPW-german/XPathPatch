@@ -3,12 +3,12 @@ using System;
 
 namespace XPP.Path;
 
-public class AstNode(AstType Type, Token Token, AstNode Child0 = null, AstNode Child1 = null)
+public class AstNode(AstType Type, Token Token, AstNode Left = null, AstNode Right = null)
 {
   public readonly AstType Type = Type;
   public readonly Token Token = Token;
-  public readonly AstNode Child0 = Child0;
-  public readonly AstNode Child1 = Child1;
+  public readonly AstNode Left = Left;
+  public readonly AstNode Right = Right;
 }
 
 public class Parser
