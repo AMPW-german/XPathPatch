@@ -38,6 +38,7 @@ public class PatchOpDeserializer
     Register<IfAnyPatch>("IfAny");
     Register<IfNonePatch>("IfNone");
     Register<WithPatch>("With");
+    Register<SetVarPatch>("SetVar");
   }
 }
 
@@ -119,4 +120,17 @@ public class WithPatch : PatchOp
 {
   public override void Build(PatchAction parent, XPNodeRef node) =>
     parent.AddChild(ActionType.OpWith, patch: node, target: node, targetPath: Path);
+}
+
+public class SetVarPatch : PatchOp
+{
+  [XmlAttribute("Name")]
+  public string Name = "";
+
+  public override void Build(PatchAction parent, XPNodeRef node)
+  {
+    var action = parent.AddChild(
+      ActionType.OpSetVar, patch: node, target: node, targetPath: Path);
+    action.SourceResult.Add(new(Name));
+  }
 }

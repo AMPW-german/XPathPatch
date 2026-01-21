@@ -1,5 +1,4 @@
 
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -71,6 +70,20 @@ public partial class PatchTests : BaseTest
         """),
       ]),
     ], "Root/Mod/A/B", "<B C='5' />"),
+    new([
+      new("Mod1", [
+        new("F1.xml", "<A><B C='1' /></A>"),
+        new("P1.xml", """
+          <Patch>
+            <SetVar Name='testvar' Path='sum($patch/X/@*)'>
+              <X A='2' B='3' />
+            </SetVar>
+            <SetVar Name='testvar' Path='$testvar*2' />
+            <Copy Path='Mod/A/B/@C' From='$testvar' />
+          </Patch>
+        """),
+      ]),
+    ], "Root/Mod/A/B", "<B C='10' />"),
   }.Select(p => new object[] { p });
 
   public record class FileCase(string Path, string Xml);

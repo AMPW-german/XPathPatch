@@ -22,6 +22,7 @@ public enum ActionType
   OpIfAny,
   OpIfNone,
   OpWith,
+  OpSetVar,
   WithCtx, // run as patch with new context node
 
   // low-level patch actions that alter the document
@@ -57,6 +58,7 @@ public static class PatchActions
     { ActionType.OpIfAny, OpIfAny },
     { ActionType.OpIfNone, OpIfNone },
     { ActionType.OpWith, OpWith },
+    { ActionType.OpSetVar, OpSetVar },
     { ActionType.WithCtx, WithCtx },
     { ActionType.Insert, Insert },
     { ActionType.InsertText, InsertText },
@@ -264,6 +266,15 @@ public static class PatchActions
           $"Path must return NodeSet, not {val.Type}");
       action.AddChild(ActionType.WithCtx, context: val.Node);
     }
+  }
+
+  public static void OpSetVar(
+    PatchOpDeserializer deserializer, PatchAction action)
+  {
+    var name = action.SourceResult[0].String;
+    if (string.IsNullOrEmpty(name))
+      throw new InvalidOperationException($"Name must not be empty");
+    action.Domain.SetVariable(name, action.TargetResult);
   }
 
   public static void WithCtx(

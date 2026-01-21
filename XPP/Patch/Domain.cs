@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Xml;
 using System.Xml.Serialization;
 using XPP.Doc;
@@ -69,10 +70,28 @@ public class PatchDomain : IXPathUserContext
     return XPath.Exec(path, context, this);
   }
 
+  public void SetVariable(string name, List<ExecValue> values)
+  {
+    if (values.Count == 0)
+    {
+      userVars[name] = new(new ExecPathOpNodeList([]));
+      return;
+    }
+    var first = values[0];
+    userVars[name] = first.Type switch
+    {
+      XPValueType.Bool => new(first.Bool),
+      XPValueType.Number => new(first.Number),
+      XPValueType.String => new(first.String),
+      XPValueType.NodeSet => new(new ExecPathOpNodeList([.. values.Select(v => v.Node)])),
+      _ => throw new InvalidOperationException($"{first.Type}"),
+    };
+  }
+
   public ExecResult GetVariable(string name, ExecPathCtx context)
   {
     if (!userVars.TryGetValue(name, out var val))
-      throw new InvalidOperationException($"unknown var {val}");
+      throw new InvalidOperationException($"unknown var {name}");
 
     if (val.Type is XPValueType.NodeSet)
       val.NodeSet.Init(context.Nav);
@@ -81,7 +100,7 @@ public class PatchDomain : IXPathUserContext
 
   public ExecResult CallFunc(string name, ExecPathCtx context, ExecResult[] args)
   {
-    throw new System.NotImplementedException();
+    throw new NotImplementedException();
   }
 
   public readonly struct PatchMod(PatchDomain Domain, string Id, XPNodeRef Node)
