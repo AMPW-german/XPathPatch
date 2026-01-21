@@ -1,5 +1,6 @@
 
 using System;
+using System.Collections.Generic;
 using XPP.Utils;
 
 namespace XPP.Doc;
@@ -9,7 +10,7 @@ public partial class XPDocument
   public const string XMLNS_PREFIX = "xmlns";
   public const string XMLNS_URI = "http://www.w3.org/2000/xmlns/";
 
-  private readonly AppendList<Node> roots = [];
+  private readonly List<Node> roots = [];
   public readonly OrderTree otree = new();
   private int docVersion = 0;
 

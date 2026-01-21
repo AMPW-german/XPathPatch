@@ -43,7 +43,7 @@ public class PatchOpDeserializer
 
 public interface IPatchOp
 {
-  public void Build(PatchLog.ActionRef parent, XPNodeRef node);
+  public void Build(PatchAction parent, XPNodeRef node);
 }
 
 public abstract class PatchOp : IPatchOp
@@ -51,7 +51,7 @@ public abstract class PatchOp : IPatchOp
   [XmlAttribute("Path")] public string Path = ".";
   [XmlAttribute("From")] public string From = "$patch/*";
 
-  public abstract void Build(PatchLog.ActionRef parent, XPNodeRef node);
+  public abstract void Build(PatchAction parent, XPNodeRef node);
 }
 
 [XmlRoot("Patch")]
@@ -59,7 +59,7 @@ public class PatchFile : PatchOp
 {
   // TODO: priority/ordering
 
-  public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
+  public override void Build(PatchAction parent, XPNodeRef node) =>
     parent.AddChild(ActionType.OpPatch, target: node);
 }
 
@@ -67,27 +67,27 @@ public class CopyPatch : PatchOp
 {
   [XmlAttribute("Pos")] public PatchPosition Pos;
 
-  public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
+  public override void Build(PatchAction parent, XPNodeRef node) =>
     parent.AddChild(
       ActionType.OpCopy, target: node, pos: Pos, targetPath: Path, sourcePath: From);
 }
 
 public class MergePatch : PatchOp
 {
-  public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
+  public override void Build(PatchAction parent, XPNodeRef node) =>
     parent.AddChild(
       ActionType.OpMerge, target: node, targetPath: Path, sourcePath: From);
 }
 
 public class DeletePatch : PatchOp
 {
-  public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
+  public override void Build(PatchAction parent, XPNodeRef node) =>
     parent.AddChild(ActionType.OpDelete, target: node, targetPath: Path);
 }
 
 public class IfPatch : PatchOp
 {
-  public override void Build(PatchLog.ActionRef parent, XPNodeRef node)
+  public override void Build(PatchAction parent, XPNodeRef node)
   {
     var action = parent.AddChild(ActionType.OpIf, target: node, targetPath: Path);
     var child = node.FirstContent;
@@ -104,18 +104,18 @@ public class IfPatch : PatchOp
 
 public class IfAnyPatch : PatchOp
 {
-  public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
+  public override void Build(PatchAction parent, XPNodeRef node) =>
     parent.AddChild(ActionType.OpIfAny, target: node, targetPath: Path);
 }
 
 public class IfNonePatch : PatchOp
 {
-  public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
+  public override void Build(PatchAction parent, XPNodeRef node) =>
     parent.AddChild(ActionType.OpIfNone, target: node, targetPath: Path);
 }
 
 public class WithPatch : PatchOp
 {
-  public override void Build(PatchLog.ActionRef parent, XPNodeRef node) =>
+  public override void Build(PatchAction parent, XPNodeRef node) =>
     parent.AddChild(ActionType.OpWith, target: node, targetPath: Path);
 }

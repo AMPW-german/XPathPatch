@@ -24,6 +24,8 @@ public class PatchDomain
   public XPNodeRef Root => Doc.LatestRoot.FirstContent;
   public virtual IEnumerable<PatchMod> Mods => mods;
 
+  public PatchExecutor Executor() => new(this);
+
   public IEnumerable<XPNodeRef> Patches
   {
     get

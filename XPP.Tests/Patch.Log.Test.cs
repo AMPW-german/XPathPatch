@@ -2,9 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using XPP.Doc;
 using XPP.Patch;
 using XPP.Path;
-using XPP.Utils;
 
 namespace XPP.Tests;
 
@@ -19,7 +19,8 @@ public partial class PatchTests
       ]),
     ], new(ActionType.Root, Children: [
       new(ActionType.OpPatch, Target: "Root/Mod/Patch", Children: [
-        new(ActionType.OpCopy, Target: "Root/Mod/Patch/Copy", SourceResults: ["v2"], Children: [
+        new(ActionType.OpCopy, Target: "Root/Mod/Patch/Copy",
+            TargetResults: [(Path)"Root/Mod/A/B/@C"], SourceResults: ["v2"], Children: [
           new(ActionType.Set, Target: "Root/Mod/A/B/@C", SourceResults: ["v2"])
         ])
       ])
@@ -60,47 +61,37 @@ public partial class PatchTests
     ActionCase[] Children = null)
   {
     public static void Equals(
-      TreeComparer t, ActionCase expected, PatchLog.ActionRef actual)
+      TreeComparer t, ActionCase expected, PatchAction actual)
     {
-      if (expected == null && !actual.Valid)
+      if (expected == null && actual == null)
         return;
       expected ??= new(ActionType.Invalid);
-      var action = actual.Valid ? actual.Action : default;
-      t.Compare("Type", expected.Type == action.Type, expected.Type, action.Type);
-      if (expected.Target != null && Path.FromNode(actual.Target) is Path atgt)
+      var atgt = Path.FromNode(actual?.Target ?? XPNodeRef.Invalid);
+      var asrc = Path.FromNode(actual?.Source ?? XPNodeRef.Invalid);
+      t.Compare("Type", expected.Type == actual?.Type, expected.Type, actual?.Type);
+      if (expected.Target != null)
         t.Compare("Target", expected.Target.Equals(atgt), expected.Target, atgt);
       else
-        t.Add($"Target = {Path.FromNode(actual.Target)}");
-      if (expected.Source != null && Path.FromNode(actual.Source) is Path asrc)
+        t.Add($"Target = {atgt}");
+      if (expected.Source != null)
         t.Compare("Source", expected.Source.Equals(asrc), expected.Source, asrc);
       if (expected.Pos != null)
-        t.Compare("Pos", expected.Pos == action.Position, expected.Pos, action.Position);
+        t.Compare("Pos", expected.Pos == actual?.Position, expected.Pos, actual?.Position);
       if (expected.TargetResults != null)
         t.Child("TargetResults", t => CompareResults(t, expected.TargetResults,
-          actual.Valid ? ResultArray(actual.TargetResult) : []), true);
+          [.. actual?.TargetResult ?? []]), true);
       if (expected.SourceResults != null)
         t.Child("SourceResults", t => CompareResults(t, expected.SourceResults,
-          actual.Valid ? ResultArray(actual.SourceResult) : []), true);
+          [.. actual?.SourceResult ?? []]), true);
 
       var echildren = expected.Children ?? [];
-      var achild = actual.FirstChild;
-      var index = 0;
-      while (index < echildren.Length || achild.Valid)
+      var achildren = actual?.Children ?? [];
+      for (var index = 0; index < echildren.Length || index < achildren.Count; index++)
       {
         var echild = index < echildren.Length ? echildren[index] : null;
+        var achild = index < achildren.Count ? achildren[index] : null;
         t.Child($"Child {index}", t => Equals(t, echild, achild), false);
-
-        index++;
-        achild = achild.NextSibling;
       }
-    }
-
-    private static ExecValue[] ResultArray(AppendList<ExecValue>.RangeEnumerator vals)
-    {
-      var arr = new ExecValue[vals.Length];
-      for (var i = 0; i < arr.Length; i++)
-        arr[i] = vals[i];
-      return arr;
     }
 
     private static object Obj(ExecValue val) => val.Type switch
@@ -149,7 +140,7 @@ public partial class PatchTests
     exec.StepToEnd();
 
     var t = new TreeComparer("");
-    ActionCase.Equals(t, pcase.Action, exec.Log.Root);
+    ActionCase.Equals(t, pcase.Action, exec.Root);
     t.Assert();
   }
 }

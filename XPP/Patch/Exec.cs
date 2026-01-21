@@ -1,60 +1,68 @@
 
 using System;
+using System.Collections.Generic;
 
 namespace XPP.Patch;
 
 public class PatchExecutor
 {
   public readonly PatchDomain Domain;
-  public readonly PatchLog Log;
-  private PatchLog.ActionRef next;
+  public readonly PatchAction Root;
+  public readonly List<PatchAction> ExecStack = [];
 
   public PatchExecutor(PatchDomain Domain)
   {
     this.Domain = Domain;
-    Log = new(Domain);
-    next = Log.Root;
+    Root = PatchAction.NewRoot(Domain);
 
     foreach (var patch in Domain.Patches)
-      next.AddChild(ActionType.OpPatch, target: patch);
+      Root.AddChild(ActionType.OpPatch, target: patch);
+
+    ExecStack.Add(Root);
   }
 
-  public bool Done => Log.Root.Finished;
-  public PatchLog.ActionRef Next => next;
+  public bool Done => Root.Finished;
+  public PatchAction Next => ExecStack.Count > 0 ? ExecStack[^1] : null;
 
   public bool Step()
   {
-    if (!next.Valid)
+    var action = Next;
+    if (action == null)
       return false;
-    var action = next;
     action.Start();
-    if (!PatchActions.Delegates.TryGetValue(action.Action.Type, out var actionDelegate))
-      throw new InvalidOperationException($"Invalid patch action {action.Action.Type}");
+    if (!PatchActions.Delegates.TryGetValue(action.Type, out var actionDelegate))
+      throw new InvalidOperationException($"Invalid patch action {action.Type}");
 
     actionDelegate(Domain.OpDeserializer, action);
     // if we have child ops, don't finish this action until they are executed
-    if ((next = action.FirstChild).Valid)
+    if (action.Children.Count > 0)
+    {
+      ExecStack.Add(action.Children[0]);
       return true;
+    }
 
     // if we are the last child, finish parent and continue, otherwise move to next sibling
-    while (action.Valid)
+    while (action != null)
     {
       action.Finish();
-
-      if ((next = action.NextSibling).Valid)
+      var parent = action.Parent;
+      if (parent != null && parent.Children.Count > action.ChildIndex + 1)
+      {
+        ExecStack[^1] = parent.Children[action.ChildIndex + 1];
         return true;
+      }
 
+      ExecStack.RemoveAt(ExecStack.Count - 1);
       action = action.Parent;
     }
 
     // if we finished the root, we are done
-    next = PatchLog.ActionRef.Invalid;
     return false;
   }
 
-  public bool UntilFinished(PatchLog.ActionRef action)
+  public bool UntilFinished(PatchAction action)
   {
-    if (!action.Valid)
+    if (action == null)
       return !Done;
     do
     {
@@ -64,9 +72,9 @@ public class PatchExecutor
     return false;
   }
 
-  public bool UntilStarted(PatchLog.ActionRef action)
+  public bool UntilStarted(PatchAction action)
   {
-    if (!action.Valid)
+    if (action == null)
       return !Done;
     do
     {
@@ -76,7 +84,7 @@ public class PatchExecutor
     return false;
   }
 
-  public bool StepOut() => UntilFinished(next.Parent);
-  public bool StepOver() => UntilFinished(next);
-  public void StepToEnd() => UntilFinished(Log.Root);
+  public bool StepOut() => UntilFinished(Next?.Parent);
+  public bool StepOver() => UntilFinished(Next);
+  public void StepToEnd() => UntilFinished(Root);
 }
