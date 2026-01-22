@@ -6,16 +6,6 @@ namespace XPP.Doc;
 
 public partial class XPDocument
 {
-  private Node Lookup(VNode vnode, int version, bool allowLate = false)
-  {
-    if (vnode.Node == null)
-      return null;
-    var node = Latest(vnode.Node, version);
-    if (!allowLate && node.Version > version)
-      return null;
-    return node;
-  }
-
   public XPNodeRef Root(int version)
   {
     version = Math.Clamp(version, 0, docVersion);
@@ -33,9 +23,25 @@ public partial class XPDocument
       throw new InvalidOperationException($"cannot set value of {node.Type} node");
     if (node.Removed)
       throw new InvalidOperationException($"node has been removed");
+    if (!CheckUpdate(node, XPUpdateType.Value))
+      return;
     node = Current(node);
     node.Value = value;
   }
+
+  private Node CheckSetUpdateFlags(VNode of)
+  {
+    if (of.Version < docVersion)
+      throw new InvalidOperationException("cannot set update flags of previous version");
+    var node = Latest(of);
+    if (node.Removed)
+      throw new InvalidOperationException($"node has been removed");
+    return Current(node);
+  }
+  internal void SetUpdateIgnore(VNode of, XPUpdateType flags) =>
+    CheckSetUpdateFlags(of).UpdateIgnore = flags;
+  internal void SetUpdateError(VNode of, XPUpdateType flags) =>
+    CheckSetUpdateFlags(of).UpdateError = flags;
 
   internal string ToString(VNode of, string indent = "")
   {
@@ -110,6 +116,8 @@ public partial struct XPNodeRef
   public string Value => Latest?.Value ?? "";
   public int EditVersion => Latest?.Version ?? -1;
   public int Depth => Latest?.Depth ?? -1;
+  public XPUpdateType UpdateIgnore => Latest?.UpdateIgnore ?? default;
+  public XPUpdateType UpdateError => Latest?.UpdateError ?? default;
 
   public XPNodeRef Parent => Make(Latest?.Parent);
   public XPNodeRef FirstContent => Make(Latest?.FirstContent);
@@ -176,6 +184,9 @@ public partial struct XPNodeRef
   public void SetValue(string value) => Doc.SetValue(VNode, value);
 
   public void Remove() => Doc.RemoveNode(Node);
+
+  public void SetUpdateIgnore(XPUpdateType flags) => Doc.SetUpdateIgnore(VNode, flags);
+  public void SetUpdateError(XPUpdateType flags) => Doc.SetUpdateError(VNode, flags);
 
   public bool SameAs(XPNodeRef other) => Latest == other.Latest;
 

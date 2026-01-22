@@ -40,10 +40,20 @@ public partial class PatchTests : BaseTest
     {
       var preExp = ((Path)expected.Path).Get(expDoc.LatestRoot);
 
-      var subDoc = XPDocument.New();
-      subDoc.LatestRoot.Import(expected.Content);
-      preExp.Parent.Import(subDoc.LatestRoot.FirstContent, after: preExp);
-      preExp.Remove();
+      if (expected.ElementContent != null)
+      {
+        var subDoc = XPDocument.New();
+        subDoc.LatestRoot.Import(expected.ElementContent);
+        preExp.Parent.Import(subDoc.LatestRoot.FirstContent, after: preExp);
+        preExp.Remove();
+      } else
+      {
+        var val = expected.StringContent ?? "";
+        if(!preExp.Type.HasValue)
+          throw new InvalidOperationException(
+            $"{preExp.Type} node at {expected.Path} cannot have value");
+        preExp.SetValue(val);
+      }
     }
 
     var exec = new PatchExecutor(domain);
@@ -76,7 +86,8 @@ public class PatchEntryFile
 public class PatchEntryExpected
 {
   [XmlAttribute("Path")] public string Path;
-  [XmlAnyElement] public XmlElement Content;
+  [XmlAnyElement] public XmlElement ElementContent;
+  [XmlText] public string StringContent;
 }
 
 public partial class PatchEntryAction

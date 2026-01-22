@@ -157,4 +157,39 @@
       <B C="10" />
     </Expected>
   </Entry>
+  <Entry Id="ignore-mod-file-delete">
+    <Mod Id="Mod1">
+      <File Path="f1.xml">
+        <A />
+      </File>
+      <File Path="p1.xml">
+        <Patch>
+          <Delete Path="Mod" />
+          <Delete Path="Mod/@Id" />
+          <Delete Path="Mod/File" />
+          <Delete Path="Mod//File/@Path" />
+        </Patch>
+      </File>
+    </Mod>
+    <Expected Path="Root/Mod/@Id">Mod1</Expected>
+    <Expected Path="Root/Mod/A/@Path">f1.xml</Expected>
+    <Expected Path="Root/Mod/Patch/@Path">p1.xml</Expected>
+  </Entry>
+  <Entry Id="ignore-mod-file-rename">
+    <Mod Id="Mod1">
+      <File Path="f1.xml">
+        <A />
+      </File>
+      <File Path="p1.xml">
+        <Patch>
+          <Copy Path="Mod/@Id">Mod2</Copy>
+          <Copy Path="Mod/A/@Path">f2.xml</Copy>
+          <Copy Path="Mod/Patch/@Path">p2.xml</Copy>
+        </Patch>
+      </File>
+    </Mod>
+    <Expected Path="Root/Mod/@Id">Mod1</Expected>
+    <Expected Path="Root/Mod/A/@Path">f1.xml</Expected>
+    <Expected Path="Root/Mod/Patch/@Path">p1.xml</Expected>
+  </Entry>
 </TestData>

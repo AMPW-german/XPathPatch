@@ -52,13 +52,16 @@ public class PatchDomain : IXPathUserContext
   public PatchDomain()
   {
     Doc = XPDocument.New();
-    Doc.LatestRoot.AddElement(RootElName);
+    var rootEl = Doc.LatestRoot.AddElement(RootElName);
+    rootEl.SetUpdateIgnore(XPUpdateType.Delete);
   }
 
   public virtual PatchMod AddMod(string id)
   {
     var node = Root.AddElement(ModElName);
-    node.AddAttribute(ModIdAttr, id);
+    node.SetUpdateIgnore(XPUpdateType.Delete);
+    var idAttr = node.AddAttribute(ModIdAttr, id);
+    idAttr.SetUpdateIgnore(XPUpdateType.Delete | XPUpdateType.Value);
     var mod = new PatchMod(this, id, node);
     mods.Add(mod);
     return mod;
@@ -118,7 +121,9 @@ public class PatchDomain : IXPathUserContext
     public XPNodeRef Import(string fileName, XmlReader reader)
     {
       var node = Node.Import(reader);
-      node.SetAttribute(Domain.FilePathAttr, NormalizePath(fileName));
+      node.SetUpdateIgnore(XPUpdateType.Delete);
+      var pathAttr = node.SetAttribute(Domain.FilePathAttr, NormalizePath(fileName));
+      pathAttr.SetUpdateIgnore(XPUpdateType.Delete | XPUpdateType.Value);
       return node;
     }
 

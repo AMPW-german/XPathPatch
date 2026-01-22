@@ -20,9 +20,9 @@
     </xs:sequence>
     <xs:attribute name="Path" type="xs:string" use="required" />
   </xs:complexType>
-  <xs:complexType name="PatchExpected">
+  <xs:complexType name="PatchExpected" mixed="true">
     <xs:sequence>
-      <xs:any processContents="skip" />
+      <xs:any processContents="skip" minOccurs="0" />
     </xs:sequence>
     <xs:attribute name="Path" type="xs:string" use="required" />
   </xs:complexType>

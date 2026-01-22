@@ -1,4 +1,6 @@
 
+using System;
+
 namespace XPP.Doc;
 
 public enum XPType
@@ -12,6 +14,16 @@ public enum XPType
   Comment,
   Attribute,
   Namespace,
+}
+
+[Flags]
+public enum XPUpdateType
+{
+  None = 0,
+  Delete = 1, // disable node delete (can still delete parent)
+  Value = 2, // disable changing node value
+  Attributes = 4, // disable editing attribute list (create or delete)
+  Content = 8, // disable editing content list (disable or delete)
 }
 
 public static partial class Extensions

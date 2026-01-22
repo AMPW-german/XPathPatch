@@ -151,6 +151,10 @@ public partial class XPDocument
     if (!type.HasValue && value != "")
       throw new InvalidOperationException($"{type} node must not have value");
 
+    var childType = type.IsAttribute ? XPUpdateType.Attributes : XPUpdateType.Content;
+    if (!CheckUpdate(parent, childType))
+      return XPNodeRef.Invalid;
+
     if (before == null && after == null)
       after = LastChild(parent, type);
 
@@ -194,12 +198,16 @@ public partial class XPDocument
     {
       if (prev != null && prev.Type == type)
       {
+        if (!CheckUpdate(prev, XPUpdateType.Value))
+          return XPNodeRef.Invalid;
         prev = Current(prev);
         prev.Value += value;
         return new(this, prev, docVersion);
       }
       if (next != null && next.Type == type)
       {
+        if (!CheckUpdate(next, XPUpdateType.Value))
+          return XPNodeRef.Invalid;
         next = Current(next);
         next.Value = value + next.Value;
         return new(this, next, docVersion);
@@ -248,7 +256,16 @@ public partial class XPDocument
       throw new InvalidOperationException($"node has already been removed");
     if (node.Parent == null)
       throw new InvalidOperationException($"cannot remove root document node");
+    if (!CheckUpdate(node, XPUpdateType.Delete))
+      return;
+    var childFlag = node.Type.IsAttribute
+      ? XPUpdateType.Attributes
+      : XPUpdateType.Content;
+    if (node.Parent != null && !CheckUpdate(node.Parent, childFlag))
+      return;
+
     TombstoneTree(node);
+    node = node.VNext ?? node;
 
     if (node.Parent != null && (node.PrevSibling == null || node.NextSibling == null))
     {
@@ -370,6 +387,15 @@ public partial class XPDocument
     throw new InvalidOperationException($"{child}");
   }
 
+  private static bool CheckUpdate(Node node, XPUpdateType type)
+  {
+    node = Latest(node);
+    if ((node.UpdateError & type) != 0)
+      throw new InvalidOperationException(
+        $"Update {type} disabled for node {node.Type} {node.Name.Local}");
+    return (node.UpdateIgnore & type) == 0;
+  }
+
   internal class Node
   {
     // basic info
@@ -395,6 +421,10 @@ public partial class XPDocument
     // node list indices of versions of this node
     public Node VPrev;
     public Node VNext;
+
+    // update locks
+    public XPUpdateType UpdateIgnore;
+    public XPUpdateType UpdateError;
 
     // remove flag
     public bool Removed;
