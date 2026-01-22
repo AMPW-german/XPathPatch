@@ -38,7 +38,7 @@ public class PatchDomain : IXPathUserContext
     {
       foreach (var mod in Mods)
       {
-        var child = mod.Node.FirstContent;
+        var child = mod.Node.LatestVersion.FirstContent;
         while (child.Valid)
         {
           if (child.Name == new XPName("", "", PatchElName))
@@ -118,7 +118,7 @@ public class PatchDomain : IXPathUserContext
     public XPNodeRef Import(string fileName, XmlReader reader)
     {
       var node = Node.Import(reader);
-      node.SetAttribute(Domain.FilePathAttr, fileName.Replace('\\', '/'));
+      node.SetAttribute(Domain.FilePathAttr, NormalizePath(fileName));
       return node;
     }
 
@@ -133,6 +133,16 @@ public class PatchDomain : IXPathUserContext
           yield return child;
         child = child.NextSibling;
       }
+    }
+
+    private static readonly bool caseSensitive =
+      !(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS());
+    private static string NormalizePath(string path)
+    {
+      path = path.Replace('\\', '/');
+      if (!caseSensitive)
+        path = path.ToLowerInvariant();
+      return path;
     }
   }
 }

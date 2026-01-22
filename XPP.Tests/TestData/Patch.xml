@@ -3,12 +3,12 @@
   xsi:noNamespaceSchemaLocation="Patch.xsd">
   <Entry Id="copy-literal-to-attr">
     <Mod Id="Mod1">
-      <File Path="F1.xml">
+      <File Path="f1.xml">
         <A>
           <B C="v1" />
         </A>
       </File>
-      <File Path="P1.xml">
+      <File Path="p1.xml">
         <Patch>
           <Copy Path="Mod/A/B/@C" From="'v2'" />
         </Patch>
@@ -33,12 +33,12 @@
   </Entry>
   <Entry Id="merge-attr-insert">
     <Mod Id="Mod1">
-      <File Path="F1.xml">
+      <File Path="f1.xml">
         <A>
           <B C="v1" />
         </A>
       </File>
-      <File Path="P1.xml">
+      <File Path="p1.xml">
         <Patch>
           <Merge Path="Mod/A" From="Mod/Patch/Merge/A">
             <A>
@@ -72,12 +72,12 @@
   </Entry>
   <Entry Id="delete-attr">
     <Mod Id="Mod1">
-      <File Path="F1.xml">
+      <File Path="f1.xml">
         <A>
           <B C="v1" />
         </A>
       </File>
-      <File Path="P1.xml">
+      <File Path="p1.xml">
         <Patch>
           <Delete Path="Mod/A/B/@C" />
         </Patch>
@@ -89,13 +89,13 @@
   </Entry>
   <Entry Id="copy-attr-literal-with-ifelse">
     <Mod Id="Mod1">
-      <File Path="F1.xml">
+      <File Path="f1.xml">
         <A>
           <B C="1" />
           <B C="2" />
         </A>
       </File>
-      <File Path="P1.xml">
+      <File Path="p1.xml">
         <Patch>
           <With Path="Mod/A/B/@C">
             <If Path=".=1">
@@ -111,7 +111,7 @@
       </File>
     </Mod>
     <Expected Path="Root/Mod/A">
-      <A Path="F1.xml">
+      <A Path="f1.xml">
         <B C="a" />
         <B C="b" />
       </A>
@@ -119,12 +119,12 @@
   </Entry>
   <Entry Id="copy-attr-expr-patchvar">
     <Mod Id="Mod1">
-      <File Path="F1.xml">
+      <File Path="f1.xml">
         <A>
           <B C="1" />
         </A>
       </File>
-      <File Path="P1.xml">
+      <File Path="p1.xml">
         <Patch>
           <Copy Path='Mod/A/B/@C' From='sum($patch/X/@*)'>
             <X A='2' B='3' />
@@ -138,12 +138,12 @@
   </Entry>
   <Entry Id="setvar-value-copy-attr-var">
     <Mod Id="Mod1">
-      <File Path="F1.xml">
+      <File Path="f1.xml">
         <A>
           <B C="1" />
         </A>
       </File>
-      <File Path="P1.xml">
+      <File Path="p1.xml">
         <Patch>
           <SetVar Name="testvar" Path="sum($patch/X/@*)">
             <X A="2" B="3" />
