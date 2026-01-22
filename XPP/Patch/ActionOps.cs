@@ -368,7 +368,7 @@ public static class PatchActions
     var mergePos = PatchPosition.Append;
     if (source.Attribute(MergePosAttrName) is XPNodeRef { Valid: true } posAttr)
     {
-      Enum.TryParse(posAttr.Value, out mergePos);
+      _ = Enum.TryParse(posAttr.Value, out mergePos);
       if (mergePos is not (PatchPosition.Append or PatchPosition.Prepend))
         throw new InvalidOperationException(
           $"Invalid {MergePosAttr} '{posAttr.Value}'. must be Append or Prepend");
@@ -384,7 +384,9 @@ public static class PatchActions
       }
       var tgtAttr = target.Attribute(srcAttr.Name);
       if (tgtAttr.Valid)
-        action.AddChild(ActionType.Set, target: tgtAttr, source: srcAttr);
+        action.AddChild(
+          ActionType.Set, target: tgtAttr
+        ).SourceResult.Add(new(srcAttr.Value));
       else if (mergePos is PatchPosition.Prepend && target.FirstAttr.Valid)
         action.AddChild(ActionType.Insert,
           target: target.FirstAttr, source: srcAttr, pos: PatchPosition.Before);
@@ -477,5 +479,40 @@ public static class PatchActions
         child = child.NextSibling;
       }
     }
+  }
+}
+
+public static partial class Extensions
+{
+  extension(ActionType type)
+  {
+    public bool HasPos => type switch
+    {
+      ActionType.OpCopy => true,
+      ActionType.Insert => true,
+      ActionType.InsertText => true,
+      _ => false,
+    };
+
+    public bool HasSrcResArg => type switch
+    {
+      ActionType.InsertText => true,
+      ActionType.Set => true,
+      _ => false,
+    };
+
+    public bool TargetsPatch => type switch
+    {
+      ActionType.OpPatch => true,
+      ActionType.OpCopy => true,
+      ActionType.OpMerge => true,
+      ActionType.OpDelete => true,
+      ActionType.OpIf => true,
+      ActionType.OpIfAny => true,
+      ActionType.OpIfNone => true,
+      ActionType.OpWith => true,
+      ActionType.OpSetVar => true,
+      _ => false,
+    };
   }
 }

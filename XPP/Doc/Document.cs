@@ -113,7 +113,7 @@ public partial class XPDocument
         throw new InvalidOperationException($"before is not latest version");
       if (before.Removed)
         throw new InvalidOperationException($"before has been removed");
-      if (before.Parent != parent)
+      if (Latest(before.Parent) != parent)
         throw new InvalidOperationException($"before is not child of parent");
       if (!before.Type.SameChildTypeAs(childType))
         throw new InvalidOperationException(
@@ -125,7 +125,7 @@ public partial class XPDocument
         throw new InvalidOperationException($"after is not latest version");
       if (after.Removed)
         throw new InvalidOperationException($"after has been removed");
-      if (after.Parent != parent)
+      if (Latest(after.Parent) != parent)
         throw new InvalidOperationException($"after is not child of parent");
       if (!after.Type.SameChildTypeAs(childType))
         throw new InvalidOperationException(
