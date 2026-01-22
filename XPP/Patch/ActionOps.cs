@@ -512,6 +512,7 @@ public static partial class Extensions
       ActionType.OpIfNone => true,
       ActionType.OpWith => true,
       ActionType.OpSetVar => true,
+      ActionType.WithCtx => true,
       _ => false,
     };
   }

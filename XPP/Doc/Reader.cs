@@ -52,6 +52,7 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
         XPType.CData => XmlNodeType.CDATA,
         XPType.ProcInst => XmlNodeType.ProcessingInstruction,
         XPType.Comment => XmlNodeType.Comment,
+        { IsAttribute: true } when state.FakeAttrText => XmlNodeType.Text,
         XPType.Attribute => XmlNodeType.Attribute,
         XPType.Namespace => XmlNodeType.Attribute,
         _ => XmlNodeType.None,
@@ -151,7 +152,7 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
   public override bool MoveToFirstAttribute() => MoveIfValid(state.FirstAttr());
   public override bool MoveToNextAttribute() => MoveIfValid(state.NextAttr());
   public override bool Read() => MoveIfValid(state.Next());
-  public override bool ReadAttributeValue() => false;
+  public override bool ReadAttributeValue() => MoveIfValid(state.AttrVal());
   public override void ResolveEntity() => throw new NotImplementedException();
 
   private struct State()
@@ -163,6 +164,7 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
     public int AttrIndex = -1;
     public int Depth = -1;
     public bool End = false;
+    public bool FakeAttrText = false;
 
     public readonly bool Valid => Node.Valid && Depth >= 0;
 
@@ -180,7 +182,8 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
       XPNodeRef? node = null,
       int? attrIndex = null,
       int? depth = null,
-      bool? end = null)
+      bool? end = null,
+      bool? fakeAttrText = null)
     {
       var copy = this;
       if (started.HasValue) copy.Started = started.Value;
@@ -188,6 +191,7 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
       if (attrIndex.HasValue) copy.AttrIndex = attrIndex.Value;
       if (depth.HasValue) copy.Depth = depth.Value;
       if (end.HasValue) copy.End = end.Value;
+      copy.FakeAttrText = fakeAttrText ?? false;
       return copy;
     }
 
@@ -230,6 +234,13 @@ public class XPDocReader(XPNodeRef _node) : XmlReader
         return With(started: true, node: Node.NextSibling, attrIndex: AttrIndex + 1);
       }
       return FirstAttr();
+    }
+
+    public State AttrVal()
+    {
+      if (FakeAttrText || !Node.Type.IsAttribute)
+        return Invalid;
+      return With(fakeAttrText: true);
     }
 
     public State ToElement()

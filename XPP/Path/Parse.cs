@@ -16,7 +16,10 @@ public class Parser
   public static AstNode Parse(string source)
   {
     var parser = new Parser(source);
-    return parser.ParseExpr();
+    var root = parser.ParseExpr();
+    if (parser.Peek(out _))
+      throw parser.Invalid();
+    return root;
   }
 
   private readonly Tokenizer tokenizer;
@@ -96,7 +99,9 @@ public class Parser
   private Exception Invalid(params TokenType[] expected)
   {
     Peek(out var tok);
-    throw new InvalidOperationException($"{tok.String} {tok.Type} != {string.Join(',', expected)}");
+    var expectedStr = expected.Length > 0 ? string.Join(',', expected) : "EOF";
+    throw new InvalidOperationException(
+      $"Unexpected {tok.Type} '{tok.String}', expected {expectedStr}");
   }
 
   private AstNode ParseLocationPath()

@@ -23,16 +23,17 @@ public class PatchExecutor
 
   public bool Done => Root.Finished;
   public PatchAction Next => ExecStack.Count > 0 ? ExecStack[^1] : null;
+  public PatchAction Last { get; private set; }
 
   public bool Step()
   {
     var action = Next;
     if (action == null)
       return false;
-    action.Start();
     if (!PatchActions.Delegates.TryGetValue(action.Type, out var actionDelegate))
       throw new InvalidOperationException($"Invalid patch action {action.Type}");
-
+    Last = action;
+    action.Start();
     actionDelegate(Domain.OpDeserializer, action);
     // if we have child ops, don't finish this action until they are executed
     if (action.Children.Count > 0)
