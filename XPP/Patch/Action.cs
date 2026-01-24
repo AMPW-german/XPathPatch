@@ -40,6 +40,8 @@ public class PatchAction
   public XPNodeRef Source = XPNodeRef.Invalid;
   public PatchPosition Position;
 
+  public Exception Error = null;
+
   // xpath query strings and outputs
   public string TargetPath;
   public string SourcePath;

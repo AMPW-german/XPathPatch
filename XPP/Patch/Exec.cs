@@ -24,41 +24,56 @@ public class PatchExecutor
   public bool Done => Root.Finished;
   public PatchAction Next => ExecStack.Count > 0 ? ExecStack[^1] : null;
   public PatchAction Last { get; private set; }
+  public bool HasError => Next?.Error != null;
 
   public bool Step()
   {
     var action = Next;
     if (action == null)
       return false;
-    if (!PatchActions.Delegates.TryGetValue(action.Type, out var actionDelegate))
-      throw new InvalidOperationException($"Invalid patch action {action.Type}");
-    Last = action;
-    action.Start();
-    actionDelegate(Domain.OpDeserializer, action);
-    // if we have child ops, don't finish this action until they are executed
-    if (action.Children.Count > 0)
+    if (action.Error != null)
+      return false;
+    try
     {
-      ExecStack.Add(action.Children[0]);
-      return true;
-    }
-
-    // if we are the last child, finish parent and continue, otherwise move to next sibling
-    while (action != null)
-    {
-      action.Finish();
-      var parent = action.Parent;
-      if (parent != null && parent.Children.Count > action.ChildIndex + 1)
+      if (!PatchActions.Delegates.TryGetValue(action.Type, out var actionDelegate))
       {
-        ExecStack[^1] = parent.Children[action.ChildIndex + 1];
+        throw new InvalidOperationException($"Invalid patch action {action.Type}");
+      }
+      Last = action;
+      action.Start();
+      actionDelegate(Domain.OpDeserializer, action);
+      // if we have child ops, don't finish this action until they are executed
+      if (action.Children.Count > 0)
+      {
+        ExecStack.Add(action.Children[0]);
         return true;
       }
 
-      ExecStack.RemoveAt(ExecStack.Count - 1);
-      action = action.Parent;
-    }
+      // if we are the last child, finish parent and continue, otherwise move to next sibling
+      while (action != null)
+      {
+        action.Finish();
+        var parent = action.Parent;
+        if (parent != null && parent.Children.Count > action.ChildIndex + 1)
+        {
+          ExecStack[^1] = parent.Children[action.ChildIndex + 1];
+          return true;
+        }
 
-    // if we finished the root, we are done
-    return false;
+        ExecStack.RemoveAt(ExecStack.Count - 1);
+        action = action.Parent;
+      }
+
+      // if we finished the root, we are done
+      return false;
+    }
+    catch (Exception ex)
+    {
+      action.Error = ex;
+      if (Next != action)
+        ExecStack.Add(action);
+      return false;
+    }
   }
 
   public bool UntilFinished(PatchAction action)
