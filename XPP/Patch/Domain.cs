@@ -106,6 +106,16 @@ public class PatchDomain : IXPathUserContext
     throw new NotImplementedException();
   }
 
+  private static readonly bool caseSensitive =
+    !(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS());
+  public static string NormalizePath(string path)
+  {
+    path = path.Replace('\\', '/');
+    if (!caseSensitive)
+      path = path.ToLowerInvariant();
+    return path;
+  }
+
   public readonly struct PatchMod(PatchDomain Domain, string Id, XPNodeRef Node)
   {
     public readonly PatchDomain Domain = Domain;
@@ -140,14 +150,17 @@ public class PatchDomain : IXPathUserContext
       }
     }
 
-    private static readonly bool caseSensitive =
-      !(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS());
-    private static string NormalizePath(string path)
+    public XPNodeRef File(string path)
     {
-      path = path.Replace('\\', '/');
-      if (!caseSensitive)
-        path = path.ToLowerInvariant();
-      return path;
+      path = NormalizePath(path);
+      var child = Node.LatestVersion.FirstContent;
+      while (child.Valid)
+      {
+        if (child.Type is XPType.Element && child.Attribute(Domain.FilePathAttr).Value == path)
+          return child;
+        child = child.NextSibling;
+      }
+      return XPNodeRef.Invalid;
     }
   }
 }
