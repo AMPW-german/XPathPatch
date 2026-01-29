@@ -39,6 +39,8 @@ public partial class PatchTests : BaseTest
     foreach (var expected in entry.Expected)
     {
       var preExp = ((Path)expected.Path).Get(expDoc.LatestRoot);
+      if (!preExp.Valid)
+        throw new InvalidOperationException($"{expected.Path}");
 
       if (expected.ElementContent != null)
       {

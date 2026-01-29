@@ -10,7 +10,22 @@
               <xs:element name="Test" maxOccurs="unbounded">
                 <xs:complexType>
                   <xs:sequence>
-                    <xs:element name="Match" minOccurs="0" maxOccurs="unbounded">
+                    <xs:element name="Bool" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute name="Value" type="xs:boolean" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="Number" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute name="Value" type="xs:double" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="String" minOccurs="0" maxOccurs="unbounded">
+                      <xs:complexType>
+                        <xs:attribute name="Value" type="xs:string" use="required" />
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="Node" minOccurs="0" maxOccurs="unbounded">
                       <xs:complexType>
                         <xs:attribute name="Path" type="xs:string" use="required" />
                       </xs:complexType>

@@ -53,186 +53,186 @@
     </A>
     <!-- ensure we are getting the starting node right -->
     <Test Id="axis-baseline" Path="A/B[3]/C[2]">
-      <Match Path="A/B#2/C#1" />
+      <Node Path="A/B#2/C#1" />
     </Test>
     <!-- test each axis to sure we are returning the right nodes -->
     <Test Id="axis-ancestor" Path="A/B[3]/C[2]/ancestor::*">
-      <Match Path="A" />
-      <Match Path="A/B#2" />
+      <Node Path="A" />
+      <Node Path="A/B#2" />
     </Test>
     <Test Id="axis-ancestor-or-self" Path="A/B[3]/C[2]/ancestor-or-self::*">
-      <Match Path="A" />
-      <Match Path="A/B#2" />
-      <Match Path="A/B#2/C#1" />
+      <Node Path="A" />
+      <Node Path="A/B#2" />
+      <Node Path="A/B#2/C#1" />
     </Test>
     <Test Id="axis-attribute" Path="A/B[3]/C[2]/attribute::*">
-      <Match Path="A/B#2/C#1/@ancestor-or-self" />
-      <Match Path="A/B#2/C#1/@descendant-or-self" />
-      <Match Path="A/B#2/C#1/@self" />
-      <Match Path="A/B#2/C#1/@X" />
-      <Match Path="A/B#2/C#1/@Y" />
-      <Match Path="A/B#2/C#1/@Z" />
+      <Node Path="A/B#2/C#1/@ancestor-or-self" />
+      <Node Path="A/B#2/C#1/@descendant-or-self" />
+      <Node Path="A/B#2/C#1/@self" />
+      <Node Path="A/B#2/C#1/@X" />
+      <Node Path="A/B#2/C#1/@Y" />
+      <Node Path="A/B#2/C#1/@Z" />
     </Test>
     <Test Id="axis-child" Path="A/B[3]/C[2]/child::*">
-      <Match Path="A/B#2/C#1/D" />
+      <Node Path="A/B#2/C#1/D" />
     </Test>
     <Test Id="axis-descendant" Path="A/B[3]/C[2]/descendant::*">
-      <Match Path="A/B#2/C#1/D" />
-      <Match Path="A/B#2/C#1/D/E" />
+      <Node Path="A/B#2/C#1/D" />
+      <Node Path="A/B#2/C#1/D/E" />
     </Test>
     <Test Id="axis-descendant-or-self" Path="A/B[3]/C[2]/descendant-or-self::*">
-      <Match Path="A/B#2/C#1" />
-      <Match Path="A/B#2/C#1/D" />
-      <Match Path="A/B#2/C#1/D/E" />
+      <Node Path="A/B#2/C#1" />
+      <Node Path="A/B#2/C#1/D" />
+      <Node Path="A/B#2/C#1/D/E" />
     </Test>
     <Test Id="axis-following" Path="A/B[3]/C[2]/following::*">
-      <Match Path="A/B#2/C#2" />
-      <Match Path="A/B#2/C#2/D" />
-      <Match Path="A/B#2/C#2/D/E" />
-      <Match Path="A/B#3" />
-      <Match Path="A/B#3/C" />
-      <Match Path="A/B#3/C/D" />
-      <Match Path="A/B#3/C/D/E" />
-      <Match Path="A/B#4" />
-      <Match Path="A/B#4/C" />
-      <Match Path="A/B#4/C/D" />
-      <Match Path="A/B#4/C/D/E" />
+      <Node Path="A/B#2/C#2" />
+      <Node Path="A/B#2/C#2/D" />
+      <Node Path="A/B#2/C#2/D/E" />
+      <Node Path="A/B#3" />
+      <Node Path="A/B#3/C" />
+      <Node Path="A/B#3/C/D" />
+      <Node Path="A/B#3/C/D/E" />
+      <Node Path="A/B#4" />
+      <Node Path="A/B#4/C" />
+      <Node Path="A/B#4/C/D" />
+      <Node Path="A/B#4/C/D/E" />
     </Test>
     <Test Id="axis-following-sibling" Path="A/B[3]/C[2]/following-sibling::*">
-      <Match Path="A/B#2/C#2" />
+      <Node Path="A/B#2/C#2" />
     </Test>
     <Test Id="axis-namespace" Path="A/B[3]/C[2]/namespace::*">
-      <Match Path="A/B#2/C#1/:L" />
-      <Match Path="A/B#2/C#1/:M" />
+      <Node Path="A/B#2/C#1/:L" />
+      <Node Path="A/B#2/C#1/:M" />
     </Test>
     <Test Id="axis-parent" Path="A/B[3]/C[2]/parent::*">
-      <Match Path="A/B#2" />
+      <Node Path="A/B#2" />
     </Test>
     <Test Id="axis-preceding" Path="A/B[3]/C[2]/preceding::*">
-      <Match Path="A/B#0" />
-      <Match Path="A/B#0/C" />
-      <Match Path="A/B#0/C/D" />
-      <Match Path="A/B#0/C/D/E" />
-      <Match Path="A/B#1" />
-      <Match Path="A/B#1/C" />
-      <Match Path="A/B#1/C/D" />
-      <Match Path="A/B#1/C/D/E" />
-      <Match Path="A/B#2/C#0" />
-      <Match Path="A/B#2/C#0/D" />
-      <Match Path="A/B#2/C#0/D/E" />
+      <Node Path="A/B#0" />
+      <Node Path="A/B#0/C" />
+      <Node Path="A/B#0/C/D" />
+      <Node Path="A/B#0/C/D/E" />
+      <Node Path="A/B#1" />
+      <Node Path="A/B#1/C" />
+      <Node Path="A/B#1/C/D" />
+      <Node Path="A/B#1/C/D/E" />
+      <Node Path="A/B#2/C#0" />
+      <Node Path="A/B#2/C#0/D" />
+      <Node Path="A/B#2/C#0/D/E" />
     </Test>
     <Test Id="axis-preceding-sibling" Path="A/B[3]/C[2]/preceding-sibling::*">
-      <Match Path="A/B#2/C#0" />
+      <Node Path="A/B#2/C#0" />
     </Test>
     <Test Id="axis-self" Path="A/B[3]/C[2]/self::*">
-      <Match Path="A/B#2/C#1" />
+      <Node Path="A/B#2/C#1" />
     </Test>
     <!-- test each axis again with position filter -->
     <Test Id="axispos-ancestor" Path="A/B[3]/C[2]/ancestor::*[position()=@ancestor]">
-      <Match Path="A" />
-      <Match Path="A/B#2" />
+      <Node Path="A" />
+      <Node Path="A/B#2" />
     </Test>
     <Test Id="axispos-ancestor-or-self"
       Path="A/B[3]/C[2]/ancestor-or-self::*[position()=@ancestor-or-self]">
-      <Match Path="A" />
-      <Match Path="A/B#2" />
-      <Match Path="A/B#2/C#1" />
+      <Node Path="A" />
+      <Node Path="A/B#2" />
+      <Node Path="A/B#2/C#1" />
     </Test>
     <!-- <Test Path="A/B[3]/C[2]/attribute::*[position()=@attribute]">
-      <Match Path="A/B#2/C#1/@ancestor-or-self" />
-      <Match Path="A/B#2/C#1/@descendant-or-self" />
-      <Match Path="A/B#2/C#1/@self" />
-      <Match Path="A/B#2/C#1/@X" />
-      <Match Path="A/B#2/C#1/@Y" />
-      <Match Path="A/B#2/C#1/@Z" />
+      <Node Path="A/B#2/C#1/@ancestor-or-self" />
+      <Node Path="A/B#2/C#1/@descendant-or-self" />
+      <Node Path="A/B#2/C#1/@self" />
+      <Node Path="A/B#2/C#1/@X" />
+      <Node Path="A/B#2/C#1/@Y" />
+      <Node Path="A/B#2/C#1/@Z" />
     </Test> -->
     <Test Id="axispos-child" Path="A/B[3]/C[2]/child::*[position()=@child]">
-      <Match Path="A/B#2/C#1/D" />
+      <Node Path="A/B#2/C#1/D" />
     </Test>
     <Test Id="axispos-descendant" Path="A/B[3]/C[2]/descendant::*[position()=@descendant]">
-      <Match Path="A/B#2/C#1/D" />
-      <Match Path="A/B#2/C#1/D/E" />
+      <Node Path="A/B#2/C#1/D" />
+      <Node Path="A/B#2/C#1/D/E" />
     </Test>
     <Test Id="axispos-descendant-or-self"
       Path="A/B[3]/C[2]/descendant-or-self::*[position()=@descendant-or-self]">
-      <Match Path="A/B#2/C#1" />
-      <Match Path="A/B#2/C#1/D" />
-      <Match Path="A/B#2/C#1/D/E" />
+      <Node Path="A/B#2/C#1" />
+      <Node Path="A/B#2/C#1/D" />
+      <Node Path="A/B#2/C#1/D/E" />
     </Test>
     <Test Id="axispos-following" Path="A/B[3]/C[2]/following::*[position()=@following]">
-      <Match Path="A/B#2/C#2" />
-      <Match Path="A/B#2/C#2/D" />
-      <Match Path="A/B#2/C#2/D/E" />
-      <Match Path="A/B#3" />
-      <Match Path="A/B#3/C" />
-      <Match Path="A/B#3/C/D" />
-      <Match Path="A/B#3/C/D/E" />
-      <Match Path="A/B#4" />
-      <Match Path="A/B#4/C" />
-      <Match Path="A/B#4/C/D" />
-      <Match Path="A/B#4/C/D/E" />
+      <Node Path="A/B#2/C#2" />
+      <Node Path="A/B#2/C#2/D" />
+      <Node Path="A/B#2/C#2/D/E" />
+      <Node Path="A/B#3" />
+      <Node Path="A/B#3/C" />
+      <Node Path="A/B#3/C/D" />
+      <Node Path="A/B#3/C/D/E" />
+      <Node Path="A/B#4" />
+      <Node Path="A/B#4/C" />
+      <Node Path="A/B#4/C/D" />
+      <Node Path="A/B#4/C/D/E" />
     </Test>
     <Test Id="axispos-following-sibling"
       Path="A/B[3]/C[2]/following-sibling::*[position()=@following-sibling]">
-      <Match Path="A/B#2/C#2" />
+      <Node Path="A/B#2/C#2" />
     </Test>
     <Test Id="axispos-namespace" Path="A/B[3]/C[2]/namespace::*[position()=.]">
-      <Match Path="A/B#2/C#1/:L" />
-      <Match Path="A/B#2/C#1/:M" />
+      <Node Path="A/B#2/C#1/:L" />
+      <Node Path="A/B#2/C#1/:M" />
     </Test>
     <Test Id="axispos-parent" Path="A/B[3]/C[2]/parent::*[position()=@parent]">
-      <Match Path="A/B#2" />
+      <Node Path="A/B#2" />
     </Test>
     <Test Id="axispos-preceding" Path="A/B[3]/C[2]/preceding::*[position()=@preceding]">
-      <Match Path="A/B#0" />
-      <Match Path="A/B#0/C" />
-      <Match Path="A/B#0/C/D" />
-      <Match Path="A/B#0/C/D/E" />
-      <Match Path="A/B#1" />
-      <Match Path="A/B#1/C" />
-      <Match Path="A/B#1/C/D" />
-      <Match Path="A/B#1/C/D/E" />
-      <Match Path="A/B#2/C#0" />
-      <Match Path="A/B#2/C#0/D" />
-      <Match Path="A/B#2/C#0/D/E" />
+      <Node Path="A/B#0" />
+      <Node Path="A/B#0/C" />
+      <Node Path="A/B#0/C/D" />
+      <Node Path="A/B#0/C/D/E" />
+      <Node Path="A/B#1" />
+      <Node Path="A/B#1/C" />
+      <Node Path="A/B#1/C/D" />
+      <Node Path="A/B#1/C/D/E" />
+      <Node Path="A/B#2/C#0" />
+      <Node Path="A/B#2/C#0/D" />
+      <Node Path="A/B#2/C#0/D/E" />
     </Test>
     <Test Id="axispos-preceding-sibling"
       Path="A/B[3]/C[2]/preceding-sibling::*[position()=@preceding-sibling]">
-      <Match Path="A/B#2/C#0" />
+      <Node Path="A/B#2/C#0" />
     </Test>
     <Test Id="axispos-self" Path="A/B[3]/C[2]/self::*[position()=@self]">
-      <Match Path="A/B#2/C#1" />
+      <Node Path="A/B#2/C#1" />
     </Test>
     <!-- ensure order on everything -->
     <Test Id="docorder" Path="//">
-      <Match Path="" />
-      <Match Path="A" />
-      <Match Path="A/B#0" />
-      <Match Path="A/B#0/C" />
-      <Match Path="A/B#0/C/D" />
-      <Match Path="A/B#0/C/D/E" />
-      <Match Path="A/B#1" />
-      <Match Path="A/B#1/C" />
-      <Match Path="A/B#1/C/D" />
-      <Match Path="A/B#1/C/D/E" />
-      <Match Path="A/B#2" />
-      <Match Path="A/B#2/C#0" />
-      <Match Path="A/B#2/C#0/D" />
-      <Match Path="A/B#2/C#0/D/E" />
-      <Match Path="A/B#2/C#1" />
-      <Match Path="A/B#2/C#1/D" />
-      <Match Path="A/B#2/C#1/D/E" />
-      <Match Path="A/B#2/C#2" />
-      <Match Path="A/B#2/C#2/D" />
-      <Match Path="A/B#2/C#2/D/E" />
-      <Match Path="A/B#3" />
-      <Match Path="A/B#3/C" />
-      <Match Path="A/B#3/C/D" />
-      <Match Path="A/B#3/C/D/E" />
-      <Match Path="A/B#4" />
-      <Match Path="A/B#4/C" />
-      <Match Path="A/B#4/C/D" />
-      <Match Path="A/B#4/C/D/E" />
+      <Node Path="" />
+      <Node Path="A" />
+      <Node Path="A/B#0" />
+      <Node Path="A/B#0/C" />
+      <Node Path="A/B#0/C/D" />
+      <Node Path="A/B#0/C/D/E" />
+      <Node Path="A/B#1" />
+      <Node Path="A/B#1/C" />
+      <Node Path="A/B#1/C/D" />
+      <Node Path="A/B#1/C/D/E" />
+      <Node Path="A/B#2" />
+      <Node Path="A/B#2/C#0" />
+      <Node Path="A/B#2/C#0/D" />
+      <Node Path="A/B#2/C#0/D/E" />
+      <Node Path="A/B#2/C#1" />
+      <Node Path="A/B#2/C#1/D" />
+      <Node Path="A/B#2/C#1/D/E" />
+      <Node Path="A/B#2/C#2" />
+      <Node Path="A/B#2/C#2/D" />
+      <Node Path="A/B#2/C#2/D/E" />
+      <Node Path="A/B#3" />
+      <Node Path="A/B#3/C" />
+      <Node Path="A/B#3/C/D" />
+      <Node Path="A/B#3/C/D/E" />
+      <Node Path="A/B#4" />
+      <Node Path="A/B#4/C" />
+      <Node Path="A/B#4/C/D" />
+      <Node Path="A/B#4/C/D/E" />
     </Test>
   </Entry>
 </TestData>

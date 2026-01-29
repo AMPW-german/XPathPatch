@@ -84,14 +84,32 @@ public partial class XPathExecTest
 {
   [XmlAttribute("Id")] public string Id;
   [XmlAttribute("Path")] public string Path;
-  [XmlElement("Match")] public List<XPathExecMatch> Matches = [];
+  [XmlElement("Bool", typeof(XPathBoolValue))]
+  [XmlElement("Number", typeof(XPathNumberValue))]
+  [XmlElement("String", typeof(XPathStringValue))]
+  [XmlElement("Node", typeof(XPathNodeValue))]
+  public List<XPathExecValue> Expected = [];
 
   public override string ToString() => Path;
 }
 
-public partial class XPathExecMatch
+public abstract partial class XPathExecValue { }
+
+public class XPathBoolValue : XPathExecValue
+{
+  [XmlAttribute("Value")] public bool Value;
+}
+public class XPathNumberValue : XPathExecValue
+{
+  [XmlAttribute("Value")] public double Value;
+}
+public class XPathStringValue : XPathExecValue
+{
+  [XmlAttribute("Value")] public string Value;
+}
+public class XPathNodeValue : XPathExecValue
 {
   [XmlAttribute("Path")] public string Path;
 
-  public static implicit operator BaseTest.Path(XPathExecMatch match) => match.Path;
+  public static implicit operator BaseTest.Path(XPathNodeValue match) => match.Path;
 }

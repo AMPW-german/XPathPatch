@@ -11,19 +11,19 @@
       </B>
     </A>
     <Test Id="simple" Path="A/B/C">
-      <Match Path="A/B#0/C" />
-      <Match Path="A/B#1/C" />
+      <Node Path="A/B#0/C" />
+      <Node Path="A/B#1/C" />
     </Test>
     <Test Id="simple-axis-index" Path="A/B/C[1]">
-      <Match Path="A/B#0/C" />
-      <Match Path="A/B#1/C" />
+      <Node Path="A/B#0/C" />
+      <Node Path="A/B#1/C" />
     </Test>
     <Test Id="simple-expr-index" Path="(A/B/C)[1]">
-      <Match Path="A/B#0/C" />
+      <Node Path="A/B#0/C" />
     </Test>
     <Test Id="filter-local-name" Path="//*[local-name()='B']">
-      <Match Path="A/B#0" />
-      <Match Path="A/B#1" />
+      <Node Path="A/B#0" />
+      <Node Path="A/B#1" />
     </Test>
   </Entry>
   <Entry>
@@ -40,10 +40,43 @@
       </B>
     </A>
     <Test Id="filter-childsum-1" Path="A/B[sum(C/@V)=6]">
-      <Match Path="A/B#0" />
+      <Node Path="A/B#0" />
     </Test>
     <Test Id="filter-childsum-2" Path="A/B[sum(C/@V)=15]">
-      <Match Path="A/B#1" />
+      <Node Path="A/B#1" />
+    </Test>
+  </Entry>
+  <Entry>
+    <A>
+      <B xmlns:C="0">1</B>
+      <B>
+        <C>2</C>
+        <?C 3?>
+        <C D="4" />
+      </B>
+      <!--5-->
+       <![CDATA[6]]>
+    </A>
+    <Test Id="doc-string-value" Path="string(/)">
+      <String Value="126" />
+    </Test>
+    <Test Id="element-string-value" Path="string(A)">
+      <String Value="126" />
+    </Test>
+    <Test Id="text-string-value" Path="string(A/B[1]/text())">
+      <String Value="1" />
+    </Test>
+    <Test Id="procinst-string-value" Path="string(A/B/processing-instruction('C'))">
+      <String Value="3" />
+    </Test>
+    <Test Id="attr-string-value" Path="string(A/B/C/@D)">
+      <String Value="4" />
+    </Test>
+    <Test Id="ns-string-value" Path="string(A/B/namespace::C)">
+      <String Value="0" />
+    </Test>
+    <Test Id="comment-string-value" Path="string(A/comment())">
+      <String Value="5" />
     </Test>
   </Entry>
 </TestData>

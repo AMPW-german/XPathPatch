@@ -49,17 +49,53 @@ public partial class XPathTests
 
     var doc = XPDocument.New();
     doc.LatestRoot.Import(srcDoc);
-    var actual = new List<Path>();
-    foreach (var res in XPath.Exec(test.Path, doc.LatestRoot))
-    {
-      if (res.Type is not XPValueType.NodeSet)
-        throw new InvalidOperationException($"{res.Type}");
-      actual.Add(Path.FromNode(res.Node));
-    }
-    var expected = new List<Path>();
-    foreach (var match in test.Matches)
-      expected.Add(match);
+    List<ExecValue> actual = [.. XPath.Exec(test.Path, doc.LatestRoot)];
 
-    CollectionAssert.AreEqual(expected, actual, ListMsg(expected, actual));
+    var t = new TreeComparer(test.Path);
+
+    for (var i = 0; i < test.Expected.Count || i < actual.Count; i++)
+    {
+      Compare(t, i,
+        i < test.Expected.Count ? test.Expected[i] : null,
+        i < actual.Count ? actual[i] : null
+      );
+    }
+
+    t.Assert();
+  }
+
+  private void Compare(TreeComparer t, int index, XPathExecValue expected, ExecValue? actual)
+  {
+    var estr = expected switch
+    {
+      null => "<null>",
+      XPathBoolValue b => $"bool {b.Value}",
+      XPathNumberValue n => $"number {n.Value:0.########}",
+      XPathStringValue s => $"string '{s.Value}'",
+      XPathNodeValue n => ((Path)n.Path).ToString(),
+      _ => throw new InvalidOperationException($"node {expected}"),
+    };
+
+    var astr = actual?.Type switch
+    {
+      null => "<null>",
+      XPValueType.Bool => $"bool {actual.Value.Bool}",
+      XPValueType.Number => $"number {actual.Value.Number:0.########}",
+      XPValueType.String => $"string '{actual.Value.String}'",
+      XPValueType.NodeSet => $"node {Path.FromNode(actual.Value.Node)}",
+      _ => throw new InvalidOperationException($"{actual?.Type}"),
+    };
+
+    var match = (expected, actual) switch
+    {
+      (XPathBoolValue e, { Type: XPValueType.Bool } a) => e.Value == a.Bool,
+      (XPathNumberValue e, { Type: XPValueType.Number } a) => e.Value == a.Number,
+      (XPathStringValue e, { Type: XPValueType.String } a) => e.Value == a.String,
+      (XPathNodeValue e, { Type: XPValueType.NodeSet } a) =>
+        Path.FromNode(a.Node).Equals((Path)e),
+      _ => false,
+    };
+
+    t.Compare($"{index}", match, estr, astr);
   }
 }

@@ -31,6 +31,9 @@ public readonly struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
 
   public bool HasNs(ReadOnlySpan<char> ns)
   {
+    if (Node.Type is XPType.Namespace)
+      return ns.Length == 0;
+
     var name = Node.Name;
     if (ns.Length == 0)
       return name.NsUri == "";
@@ -76,25 +79,22 @@ public readonly struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
   private static bool Make(XPNodeRef node, out XPNavigator nav) =>
     (nav = new(node)).Node.Valid;
 
-  public void StringValue(StringBuilder sb) => BuildStringValue(Node, sb, false);
+  public void StringValue(StringBuilder sb) => BuildStringValue(Node, sb);
 
-  private static void BuildStringValue(XPNodeRef node, StringBuilder sb, bool siblings = true)
+  private static void BuildStringValue(XPNodeRef node, StringBuilder sb)
   {
-    while (node.Valid)
+    if (node.Type is not (XPType.Element or XPType.Document))
     {
-      var type = node.Type;
-      if (type is XPType.Comment)
-      {
-        // noop
-      }
-      else if (type.HasValue)
-        sb.Append(node.Value);
-      else if (type.CanHaveContent)
-        BuildStringValue(node.FirstContent, sb);
+      sb.Append(node.Value);
+      return;
+    }
 
-      if (!siblings)
-        return;
-      node = node.NextSibling;
+    var child = node.FirstContent;
+    while (child.Valid)
+    {
+      if (child.Type is XPType.Text or XPType.CData or XPType.Element)
+        BuildStringValue(child, sb);
+      child = child.NextSibling;
     }
   }
 

@@ -70,6 +70,38 @@
       </Action>
     </Action>
   </Entry>
+  <Entry Id="merge-element-text">
+    <Mod Id="Mod1">
+      <File Path="f1.xml">
+        <A>
+          <B>1</B>
+          <B Id="2">
+            <C>3</C>
+          </B>
+        </A>
+      </File>
+      <File Path="p1.xml">
+        <Patch>
+          <Merge Path="Mod/A">
+            <A>
+              <B Id="2">
+                <C>5</C>
+              </B>
+              <B>4</B>
+            </A>
+          </Merge>
+        </Patch>
+      </File>
+    </Mod>
+    <Expected Path="Root/Mod/A">
+      <A Path="f1.xml">
+        <B>4</B>
+        <B Id="2">
+          <C>5</C>
+        </B>
+      </A>
+    </Expected>
+  </Entry>
   <Entry Id="delete-attr">
     <Mod Id="Mod1">
       <File Path="f1.xml">

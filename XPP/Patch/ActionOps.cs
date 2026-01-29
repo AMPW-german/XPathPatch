@@ -134,6 +134,8 @@ public static class PatchActions
         insert.SourceResult.Add(new(src.StringValue));
       }
     }
+    if (action.Position is PatchPosition.Replace)
+      action.AddChild(ActionType.Remove, target: target);
   }
 
   private static void OpCopyText(XPNodeRef target, PatchAction action)
@@ -397,6 +399,14 @@ public static class PatchActions
       srcAttr = srcAttr.NextSibling;
     }
 
+    if (SingleTextChild(source) && SingleTextChild(target))
+    {
+      action.AddChild(
+        ActionType.Set, target: target.FirstContent
+      ).SourceResult.Add(new(source.FirstContent.Value));
+      return;
+    }
+
     var srcChild = source.FirstContent;
     while (srcChild.Valid)
     {
@@ -452,6 +462,15 @@ public static class PatchActions
       }
       return XPNodeRef.Invalid;
     }
+  }
+
+  private static bool SingleTextChild(XPNodeRef node)
+  {
+    if (node.Type is not XPType.Element)
+      return false;
+    var first = node.FirstContent;
+    var last = node.LastContent;
+    return first.Valid && first.Type is XPType.Text && first.SameAs(last);
   }
 
   private static void CleanMergeAttrs(XPNodeRef node)
