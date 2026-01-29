@@ -178,7 +178,7 @@ public partial class XPath
     "preceding" => AxisType.Preceding,
     "preceding-sibling" => AxisType.PrecedingSibling,
     "self" => AxisType.Self,
-    _ => throw new InvalidOperationException($"Invalid AxisType {name}"),
+    _ => throw new InvalidOperationException($"Invalid AxisType {new string(name)}"),
   };
 
   public static NodeType ParseNodeType(ReadOnlySpan<char> name) => name switch
@@ -187,7 +187,7 @@ public partial class XPath
     "text" => NodeType.Text,
     "processing-instruction" => NodeType.ProcessingInstruction,
     "node" => NodeType.Node,
-    _ => throw new InvalidOperationException($"Invalid NodeType {name}"),
+    _ => throw new InvalidOperationException($"Invalid NodeType {new string(name)}"),
   };
 
   public static LibraryFunc ParseLibraryFunc(ReadOnlySpan<char> name) => name switch

@@ -107,7 +107,7 @@ public class PatchDomain : IXPathUserContext
   }
 
   private static readonly bool caseSensitive =
-    !(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS());
+    Environment.OSVersion.Platform is PlatformID.Unix;
   public static string NormalizePath(string path)
   {
     path = path.Replace('\\', '/');

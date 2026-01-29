@@ -14,6 +14,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DefaultItemExcludes>$(DefaultItemExcludes);XPP.Tests/**</DefaultItemExcludes>
   </PropertyGroup>
+  <Import Project="$(SolutionDir)/XPP.overrides.props" Condition="Exists('$(SolutionDir)/XPP.overrides.props')" />
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>portable</DebugType>

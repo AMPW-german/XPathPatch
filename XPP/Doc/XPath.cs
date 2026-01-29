@@ -50,7 +50,8 @@ public readonly struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
   public bool LastChild(out XPNavigator nav) => Make(Node.LastContent, out nav);
   public bool NextSibling(out XPNavigator nav) =>
     Make(Node.Type.IsContent ? Node.NextSibling : XPNodeRef.Invalid, out nav);
-  public bool PreviousSibling(out XPNavigator nav) {
+  public bool PreviousSibling(out XPNavigator nav)
+  {
     if (!Node.Valid) throw new InvalidOperationException();
     return Make(Node.Type.IsContent ? Node.PrevSibling : XPNodeRef.Invalid, out nav);
   }
@@ -75,26 +76,26 @@ public readonly struct XPNavigator(XPNodeRef Node) : IComparable<XPNavigator>
   private static bool Make(XPNodeRef node, out XPNavigator nav) =>
     (nav = new(node)).Node.Valid;
 
-  public void StringValue(StringBuilder sb) => BuildStringValue(Node, sb);
+  public void StringValue(StringBuilder sb) => BuildStringValue(Node, sb, false);
 
-  private static void BuildStringValue(XPNodeRef node, StringBuilder sb)
+  private static void BuildStringValue(XPNodeRef node, StringBuilder sb, bool siblings = true)
   {
-    if (!node.Valid)
-      return;
-    var type = node.Type;
-    if (type is XPType.Comment)
+    while (node.Valid)
     {
-      // noop
+      var type = node.Type;
+      if (type is XPType.Comment)
+      {
+        // noop
+      }
+      else if (type.HasValue)
+        sb.Append(node.Value);
+      else if (type.CanHaveContent)
+        BuildStringValue(node.FirstContent, sb);
+
+      if (!siblings)
+        return;
+      node = node.NextSibling;
     }
-    else if (type.HasValue)
-      sb.Append(node.Value);
-    else if (type.CanHaveContent)
-      BuildStringValue(node.FirstContent, sb);
-
-    if (!type.IsContent)
-      return;
-
-    BuildStringValue(node.FirstContent, sb);
   }
 
   public bool SameAs(XPNavigator other) => Node.SameAs(other.Node);
