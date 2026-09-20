@@ -10,6 +10,10 @@ public class PatchExecutor
   public readonly PatchAction Root;
   public readonly List<PatchAction> ExecStack = [];
 
+  public event Action<PatchAction> ActionStarted;
+  public event Action<PatchAction> ActionCompleted;
+  public event Action<PatchAction> ActionFailed;
+
   public PatchExecutor(PatchDomain Domain)
   {
     this.Domain = Domain;
@@ -41,6 +45,7 @@ public class PatchExecutor
       }
       Last = action;
       action.Start();
+      Notify(ActionStarted, action);
       actionDelegate(Domain.OpDeserializer, action);
       // if we have child ops, don't finish this action until they are executed
       if (action.Children.Count > 0)
@@ -53,6 +58,7 @@ public class PatchExecutor
       while (action != null)
       {
         action.Finish();
+        Notify(ActionCompleted, action);
         var parent = action.Parent;
         if (parent != null && parent.Children.Count > action.ChildIndex + 1)
         {
@@ -70,9 +76,27 @@ public class PatchExecutor
     catch (Exception ex)
     {
       action.Error = ex;
+      Notify(ActionFailed, action);
       if (Next != action)
         ExecStack.Add(action);
       return false;
+    }
+  }
+
+  private static void Notify(Action<PatchAction> handlers, PatchAction action)
+  {
+    if (handlers == null)
+      return;
+
+    foreach (Action<PatchAction> handler in handlers.GetInvocationList())
+    {
+      try
+      {
+        handler(action);
+      }
+      catch
+      {
+      }
     }
   }
 
